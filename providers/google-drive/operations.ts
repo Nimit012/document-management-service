@@ -3,29 +3,35 @@ import { GoogleAuthHelper } from './auth';
 import { ProviderError, NotFoundError } from '../../src/types';
 
 /**
- * Document Operations Helper
- * 
- * Handles core document operations for Google Drive:
+ * Helper for Google Drive document operations.
+ *
+ * Provides core document operations for Google Drive:
  * - Copy documents with ownership transfer
  * - Get document metadata
  * - Update document names
  * - Delete documents
  */
 export class DocumentOperations {
+  /**
+   * Creates a new DocumentOperations instance.
+   * @param authHelper The GoogleAuthHelper used for authentication and impersonation.
+   */
   constructor(private authHelper: GoogleAuthHelper) {}
 
   /**
-   * Copy document with ownership transfer
-   * 
-   * This is the two-step process:
-   * 1. Impersonate source owner to copy their document
-   * 2. Impersonate admin to transfer ownership
-   * 
-   * @param sourceDocId - Source document ID to copy from
-   * @param sourceOwnerEmail - Email of user who owns/can access source
-   * @param newName - Name for the copied document (optional)
-   * @param folderId - Parent folder ID (optional)
-   * @returns Copied file metadata
+   * Copies a document and transfers ownership to the admin.
+   *
+   * Two-step process:
+   * 1. Impersonate the source owner to copy their document.
+   * 2. Impersonate the admin to transfer ownership.
+   *
+   * @param sourceDocId Source document ID to copy from.
+   * @param sourceOwnerEmail Email of the user who owns/can access the source.
+   * @param newName Name for the copied document (optional).
+   * @param folderId Parent folder ID (optional).
+   * @returns Copied file metadata as a Drive file object.
+   * @throws {NotFoundError} If the source document is not found.
+   * @throws {ProviderError} If the copy or transfer fails.
    */
   async copyDocument(
     sourceDocId: string,
@@ -68,6 +74,4 @@ export class DocumentOperations {
       throw new ProviderError(`Failed to copy document: ${error.message}`, error);
     }
   }
-
-
 }

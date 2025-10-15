@@ -5,44 +5,60 @@ import { GoogleDriveConfig, ServiceAccountKey } from '../../src/types';
 import { ProviderError } from '../../src/types';
 
 /**
- * Google Auth Helper
- * 
- * Handles authentication and client creation for Google Drive API
- * using service account with domain-wide delegation.
- * 
- * Key concept: Service account can impersonate any user in the domain
+ * Google authentication helper for Drive API operations.
+ *
+ * Handles authentication and client creation for the Google Drive API
+ * using a service account with domain-wide delegation.
+ *
+ * Key concept: The service account can impersonate any user in the domain
  * by setting the 'subject' field in JWT credentials.
  */
 export class GoogleAuthHelper {
+  /**
+   * The service account key used for authentication.
+   */
   private serviceAccountKey: ServiceAccountKey;
-  private adminEmail: string;
-  private scopes: string[];
-  private driveClientCache: Map<string, drive_v3.Drive>; 
-
 
   /**
-   * @param config - Google Drive configuration with service account credentials
+   * The admin email address for the domain.
+   */
+  private adminEmail: string;
+
+  /**
+   * OAuth scopes required for Drive API access.
+   */
+  private scopes: string[];
+
+  /**
+   * Cache for Drive API client instances per impersonated user.
+   */
+  private driveClientCache: Map<string, drive_v3.Drive>;
+
+  /**
+   * Constructs a new GoogleAuthHelper instance.
+   * @param config Google Drive configuration with service account credentials.
    */
   constructor(config: GoogleDriveConfig) {
     this.serviceAccountKey = config.serviceAccountKey;
     this.adminEmail = config.adminEmail;
 
-    // Define OAuth scopes - what permissions we need
+    // Define OAuth scopes for required permissions
     this.scopes = [
       'https://www.googleapis.com/auth/drive', // Full Drive access
       'https://www.googleapis.com/auth/drive.file', // Access to files created by app
       'https://www.googleapis.com/auth/drive.metadata', // Access to file metadata
     ];
 
-    //  Initialize cache
-    this.driveClientCache = new Map();  
+    // Initialize the Drive client cache
+    this.driveClientCache = new Map();
 
     // Validate service account key structure
     this.validateServiceAccountKey();
   }
 
   /**
-   * Validate that service account key has required fields
+   * Validates that the service account key contains all required fields.
+   * @throws {ProviderError} If required fields are missing.
    */
   private validateServiceAccountKey(): void {
     const required = ['client_email', 'private_key'];
@@ -50,21 +66,22 @@ export class GoogleAuthHelper {
 
     if (missing.length > 0) {
       throw new ProviderError(
-        `Service account key is missing required fields: ${missing.join(', ')}`
+        `Service account key is missing required fields: ${missing.join(', ')}`,
       );
     }
   }
 
   /**
-   * Create JWT auth client that impersonates a specific user
-   * 
-   * This is the core of domain-wide delegation:
-   * - Service account authenticates as itself
-   * - Then acts as the specified user (subject)
-   * - All API calls appear to come from that user
-   * 
-   * @param impersonateEmail - Email of user to impersonate
-   * @returns Authenticated JWT client
+   * Creates a JWT auth client that impersonates a specific user.
+   *
+   * Domain-wide delegation steps:
+   * - Service account authenticates as itself.
+   * - Acts as the specified user (subject).
+   * - All API calls appear to come from that user.
+   *
+   * @param impersonateEmail Email of the user to impersonate.
+   * @returns Authenticated JWT client.
+   * @throws {ProviderError} If the client cannot be created.
    */
   createAuthClient(impersonateEmail: string): JWT {
     try {
@@ -72,26 +89,26 @@ export class GoogleAuthHelper {
         email: this.serviceAccountKey.client_email,
         key: this.serviceAccountKey.private_key,
         scopes: this.scopes,
-        subject: impersonateEmail, // THIS IS THE IMPERSONATION MAGIC
+        subject: impersonateEmail, // Impersonation
       });
 
       return jwtClient;
     } catch (error) {
       throw new ProviderError(
         `Failed to create auth client for user: ${impersonateEmail}`,
-        error
+        error,
       );
     }
   }
 
   /**
-   * Create authenticated Google Drive API client
-   * 
-   * This is what you'll use to make actual API calls.
-   * All calls will be made as the impersonated user.
-   * 
-   * @param impersonateEmail - Email of user to impersonate
-   * @returns Google Drive v3 API client
+   * Creates an authenticated Google Drive API client for the impersonated user.
+   *
+   * All API calls will be made as the impersonated user.
+   *
+   * @param impersonateEmail Email of the user to impersonate.
+   * @returns Google Drive v3 API client.
+   * @throws {ProviderError} If the client cannot be created.
    */
   createDriveClient(impersonateEmail: string): drive_v3.Drive {
     if (this.driveClientCache.has(impersonateEmail)) {
@@ -106,22 +123,22 @@ export class GoogleAuthHelper {
         auth: auth,
       });
 
-      // Cache it
+      // Cache the client
       this.driveClientCache.set(impersonateEmail, driveClient);
       return driveClient;
     } catch (error) {
       throw new ProviderError(
         `Failed to create Drive client for user: ${impersonateEmail}`,
-        error
+        error,
       );
     }
   }
 
   /**
-   * Get admin email (for convenience)
+   * Returns the admin email for the domain.
+   * @returns The admin email address.
    */
   getAdminEmail(): string {
     return this.adminEmail;
   }
-
 }

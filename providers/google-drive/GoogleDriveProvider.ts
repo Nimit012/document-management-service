@@ -8,19 +8,47 @@ import { MetadataManager } from './metadata';
 import { FolderManager } from './folders';
 
 /**
- * Google Drive Storage Provider
+ * Google Drive Storage Provider implementation.
  *
- * Implements IStorageProvider for Google Drive.
- * Orchestrates all helper modules to provide complete document management.
+ * Implements the {@link IStorageProvider} interface for Google Drive.
+ * Orchestrates all helper modules (auth, operations, permissions, metadata, folders)
+ * to provide complete document management functionality.
  */
 export class GoogleDriveProvider implements IStorageProvider {
+  /**
+   * Helper for Google authentication and impersonation.
+   */
   private authHelper: GoogleAuthHelper;
+
+  /**
+   * Handles document-level operations (copy, move, etc.).
+   */
   private operations: DocumentOperations;
+
+  /**
+   * Manages permissions for Google Drive files.
+   */
   private permissions: PermissionsManager;
+
+  /**
+   * Handles custom metadata for documents.
+   */
   private metadata: MetadataManager;
+
+  /**
+   * Manages folder creation and navigation.
+   */
   private folders: FolderManager;
+
+  /**
+   * Provider-specific configuration.
+   */
   private config: GoogleDriveConfig;
 
+  /**
+   * Constructs a new GoogleDriveProvider instance.
+   * @param config The configuration object for Google Drive integration.
+   */
   constructor(config: GoogleDriveConfig) {
     this.config = config;
     this.authHelper = new GoogleAuthHelper(config);
@@ -32,6 +60,19 @@ export class GoogleDriveProvider implements IStorageProvider {
 
   // ==================== DOCUMENT OPERATIONS ====================
 
+  /**
+   * Copies a document in Google Drive according to the request details.
+   *
+   * Steps:
+   * 1. Creates the target folder structure if `folder_path` is provided.
+   * 2. Copies the source document, impersonating the source owner.
+   * 3. Sets permissions if `access_control` is specified.
+   * 4. Transforms the copied file into the Document format.
+   *
+   * @param request The document creation request, including source reference, owner, name, folder path, and access control.
+   * @returns The created Document object.
+   * @throws {ProviderError} If any step fails during the process.
+   */
   async copyDocument(request: CreateDocumentRequest): Promise<Document> {
     try {
       // 1. Create folder
@@ -39,7 +80,7 @@ export class GoogleDriveProvider implements IStorageProvider {
       if (request.folder_path) {
         folderId = await this.folders.createPath(request.folder_path);
       }
-  
+
       // 2. Copy document
       const copiedFile = await this.operations.copyDocument(
         request.source_reference,
@@ -47,25 +88,26 @@ export class GoogleDriveProvider implements IStorageProvider {
         request.name,
         folderId
       );
-  
+
       // 3. Set permissions
       if (request.access_control && request.access_control.length > 0) {
         await this.permissions.setPermissions(copiedFile.id!, request.access_control);
       }
-  
+
       // 4. Transform to Document
       return this.transformToDocument(copiedFile);
     } catch (error: any) {
       throw new ProviderError(`Failed to create document: ${error.message}`, error);
     }
   }
-  
-
 
   // ==================== HELPER METHODS ====================
 
   /**
-   * Transform Google Drive file to Document format
+   * Converts a Google Drive file object to the internal Document format.
+   *
+   * @param file The Google Drive file to convert.
+   * @returns The corresponding Document object.
    */
   private transformToDocument(file: drive_v3.Schema$File): Document {
     return {
