@@ -17,6 +17,8 @@ export class GoogleAuthHelper {
   private serviceAccountKey: ServiceAccountKey;
   private adminEmail: string;
   private scopes: string[];
+  private driveClientCache: Map<string, drive_v3.Drive>; 
+
 
   /**
    * @param config - Google Drive configuration with service account credentials
@@ -31,6 +33,9 @@ export class GoogleAuthHelper {
       'https://www.googleapis.com/auth/drive.file', // Access to files created by app
       'https://www.googleapis.com/auth/drive.metadata', // Access to file metadata
     ];
+
+    //  Initialize cache
+    this.driveClientCache = new Map();  
 
     // Validate service account key structure
     this.validateServiceAccountKey();
@@ -89,14 +94,20 @@ export class GoogleAuthHelper {
    * @returns Google Drive v3 API client
    */
   createDriveClient(impersonateEmail: string): drive_v3.Drive {
+    if (this.driveClientCache.has(impersonateEmail)) {
+      return this.driveClientCache.get(impersonateEmail)!;
+    }
+
+    // Create new client
     try {
       const auth = this.createAuthClient(impersonateEmail);
-
       const driveClient = google.drive({
         version: 'v3',
         auth: auth,
       });
 
+      // Cache it
+      this.driveClientCache.set(impersonateEmail, driveClient);
       return driveClient;
     } catch (error) {
       throw new ProviderError(
@@ -113,35 +124,4 @@ export class GoogleAuthHelper {
     return this.adminEmail;
   }
 
-  /**
-   * Test authentication by making a simple API call
-   * Useful for debugging and validating setup
-   * 
-   * @param impersonateEmail - Email to test impersonation with
-   * @returns True if authentication works
-   */
-  async testAuthentication(impersonateEmail: string): Promise<boolean> {
-    try {
-      const drive = this.createDriveClient(impersonateEmail);
-
-      // Make a simple API call - get user's about info
-      const response = await drive.about.get({
-        fields: 'user',
-      });
-
-      if (response.data.user?.emailAddress === impersonateEmail) {
-        console.log(`✅ Successfully authenticated as: ${impersonateEmail}`);
-        return true;
-      } else {
-        console.error(`❌ Authentication failed - expected ${impersonateEmail}, got ${response.data.user?.emailAddress}`);
-        return false;
-      }
-    } catch (error) {
-      console.error(`❌ Authentication test failed for ${impersonateEmail}:`, error);
-      throw new ProviderError(
-        `Authentication test failed for ${impersonateEmail}. Make sure domain-wide delegation is enabled.`,
-        error
-      );
-    }
-  }
 }

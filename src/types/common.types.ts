@@ -18,7 +18,6 @@ export interface Document {
  * Request to create a new document by copying from source
  */
 export interface CreateDocumentRequest {
-  provider: 'google_drive' | 's3';
   source_reference: string;
   source_owner: string; // Email of user who owns/can access the source document
   name?: string;
