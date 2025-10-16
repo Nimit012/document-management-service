@@ -3,7 +3,6 @@ import { IStorageProvider } from '../IStorageProvider';
 import { Document, CreateDocumentRequest, GoogleDriveConfig, ProviderError } from '../../src/types';
 import { GoogleAuthHelper } from './auth';
 import { DocumentOperations } from './operations';
-import { MetadataManager } from './metadata';
 
 /**
  * Google Drive Storage Provider implementation.
@@ -23,10 +22,7 @@ export class GoogleDriveProvider implements IStorageProvider {
    */
   private operations: DocumentOperations;
 
-  /**
-   * Handles custom metadata for documents.
-   */
-  private metadata: MetadataManager;
+
 
   /**
    * Provider-specific configuration.
@@ -41,7 +37,6 @@ export class GoogleDriveProvider implements IStorageProvider {
     this.config = config;
     this.authHelper = new GoogleAuthHelper(config);
     this.operations = new DocumentOperations(this.authHelper);
-    this.metadata = new MetadataManager(this.authHelper);
   }
 
   // ==================== DOCUMENT OPERATIONS ====================
@@ -61,23 +56,26 @@ export class GoogleDriveProvider implements IStorageProvider {
    */
   async copyDocument(request: CreateDocumentRequest): Promise<Document> {
     try {
-      // 1. Create folder
-      let folderId: string | undefined;
-      if (request.folder_path) {
-        folderId = await this.operations.createPath(request.folder_path);
-      }
-
-      // 2. Copy document
+ 
+      // 1. Copy document
       const copiedFile = await this.operations.copyDocument(
         request.source_reference,
         request.source_owner,
         request.name,
-        folderId
       );
 
-      // 3. Transfer ownership to admin
-      await this.operations.transferToAdmin(copiedFile.id!);
+      // 2. Transfer ownership to admin
+      await this.operations.transferToAdmin(request.source_owner, copiedFile.id!);
 
+
+    // Step 3: Move to folder (if specified)
+
+      if (request.folder_path) {
+        const folderId = await this.operations.createPath(request.folder_path);
+        await this.operations.moveToFolder(copiedFile.id!, folderId);
+      }
+
+      
       // 4. Set permissions
       if (request.access_control && request.access_control.length > 0) {
         await this.operations.setPermissions(copiedFile.id!, request.access_control);
@@ -90,6 +88,11 @@ export class GoogleDriveProvider implements IStorageProvider {
       throw new ProviderError(`Failed to create document: ${errorMessage}`, error);
     }
   }
+
+
+
+
+
 
   // ==================== HELPER METHODS ====================
 
@@ -110,4 +113,8 @@ export class GoogleDriveProvider implements IStorageProvider {
       updated_at: file.modifiedTime || undefined,
     };
   }
+
+
+
+  
 }

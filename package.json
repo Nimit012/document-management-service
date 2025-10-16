@@ -1,7 +1,6 @@
 {
   "name": "document-management-service",
   "version": "1.0.0",
-  "type": "module",
   "description": "Document management library for educational platforms",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

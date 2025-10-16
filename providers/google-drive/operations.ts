@@ -35,7 +35,6 @@ export class DocumentOperations {
     sourceDocId: string,
     sourceOwnerEmail: string,
     newName?: string,
-    folderId?: string
   ): Promise<drive_v3.Schema$File> {
     try {
       const sourceDriveClient = await this.authHelper.createDriveClient(sourceOwnerEmail);
@@ -44,7 +43,6 @@ export class DocumentOperations {
         fileId: sourceDocId,
         requestBody: {
           name: newName,
-          parents: folderId ? [folderId] : undefined,
         },
         fields: 'id,name,webViewLink,createdTime,modifiedTime,mimeType', // return these fields in response
       });
@@ -66,12 +64,14 @@ export class DocumentOperations {
    * @throws {ProviderError} If the ownership transfer fails.
    */
   async transferToAdmin(
+    sourceOwnerEmail: string,
     fileId: string,
   ): Promise<void> {
     try {
       const adminEmail = this.authHelper.getAdminEmail();
-      const adminDriveClient = await this.authHelper.createAdminDriveClient();
-      await adminDriveClient.permissions.create({
+      const sourceDriveClient = await this.authHelper.createDriveClient(sourceOwnerEmail);
+
+      await sourceDriveClient.permissions.create({
         fileId: fileId,
         requestBody: {
           role: 'owner',
@@ -80,6 +80,26 @@ export class DocumentOperations {
         },
         transferOwnership: true,
       });
+
+
+      const adminDriveClient = await this.authHelper.createAdminDriveClient();
+    
+      const permissions = await adminDriveClient.permissions.list({
+        fileId: fileId,
+        fields: 'permissions(id,emailAddress,role)',
+      });
+  
+      // Find teacher's permission
+      const teacherPermission = permissions.data.permissions?.find(
+        p => p.emailAddress === sourceOwnerEmail
+      );
+  
+      if (teacherPermission?.id) {
+        await adminDriveClient.permissions.delete({
+          fileId: fileId,
+          permissionId: teacherPermission.id,
+        });
+      }
       
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -416,5 +436,45 @@ export class DocumentOperations {
 
     return response.data.id;
   }
+
+
+
+
+  /**
+ * Moves a document to a specific folder.
+ * Removes document from all current parent folders and places in new folder.
+ * Must be called as the document owner.
+ *
+ * @param fileId The ID of the file to move.
+ * @param folderId The ID of the destination folder.
+ * @throws {ProviderError} If the move operation fails.
+ */
+async moveToFolder(
+  fileId: string,
+  folderId: string
+): Promise<void> {
+  try {
+    const adminDriveClient = await this.authHelper.createAdminDriveClient();
+    
+    // Get current parents
+    const file = await adminDriveClient.files.get({
+      fileId: fileId,
+      fields: 'parents',
+    });
+
+    const previousParents = file.data.parents?.join(',') || '';
+
+    // Move file to new folder and remove from old parents
+    await adminDriveClient.files.update({
+      fileId: fileId,
+      addParents: folderId,
+      removeParents: previousParents,
+      fields: 'id,parents',
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    throw new ProviderError(`Failed to move document to folder: ${errorMessage}`, error);
+  }
+}
 
 }

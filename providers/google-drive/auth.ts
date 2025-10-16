@@ -45,8 +45,6 @@ export class GoogleAuthHelper {
     // Define OAuth scopes for required permissions
     this.scopes = [
       'https://www.googleapis.com/auth/drive', // Full Drive access
-      'https://www.googleapis.com/auth/drive.file', // Access to files created by app
-      'https://www.googleapis.com/auth/drive.metadata', // Access to file metadata
     ];
 
     // Initialize the Drive client cache
@@ -85,7 +83,7 @@ export class GoogleAuthHelper {
    */
   private createAuthClient(impersonateEmail: string): GoogleAuth {
     try {
-      const auth = new GoogleAuth({
+      const auth = new google.auth.GoogleAuth({
         credentials: this.serviceAccountKey,
         scopes: this.scopes,
         clientOptions: {
