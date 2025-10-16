@@ -1,4 +1,12 @@
 /**
+ * Supported storage provider types
+ */
+export enum ProviderType {
+  GOOGLE_DRIVE = 'google_drive',
+  S3 = 's3'
+}
+
+/**
  * Google Drive provider configuration
  */
 export interface GoogleDriveConfig {

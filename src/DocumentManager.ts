@@ -4,6 +4,7 @@ import {
   CreateDocumentRequest,
   GoogleDriveConfig,
   ValidationError,
+  ProviderType,
 } from './types';
 
 import { IStorageProvider } from '../providers/IStorageProvider';
@@ -16,7 +17,7 @@ import { IStorageProvider } from '../providers/IStorageProvider';
 interface DocumentManagerConfig {
  
   /** The type of storage provider to use. */
-  provider: 'google_drive' | 's3';
+  provider: ProviderType;
   
   /** Provider-specific configuration. */
   config: GoogleDriveConfig; // Will be union type when S3 added
@@ -39,9 +40,9 @@ export class DocumentManager {
    */
   constructor(options: DocumentManagerConfig) {
     // Create provider based on type
-    if (options.provider === 'google_drive') {
+    if (options.provider === ProviderType.GOOGLE_DRIVE) {
       this.provider = new GoogleDriveProvider(options.config);
-    } else if (options.provider === 's3') {
+    } else if (options.provider === ProviderType.S3) {
       throw new Error('S3 provider not yet implemented');
     } else {
       throw new ValidationError(`Unsupported provider: ${options.provider}`);

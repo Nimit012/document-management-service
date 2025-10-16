@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { JWT } from 'google-auth-library';
+import { GoogleAuth } from 'google-auth-library';
 import { drive_v3 } from 'googleapis';
 import { GoogleDriveConfig, ServiceAccountKey } from '../../src/types';
 import { ProviderError } from '../../src/types';
@@ -11,7 +11,7 @@ import { ProviderError } from '../../src/types';
  * using a service account with domain-wide delegation.
  *
  * Key concept: The service account can impersonate any user in the domain
- * by setting the 'subject' field in JWT credentials.
+ * by setting the 'subject' field in the clientOptions.
  */
 export class GoogleAuthHelper {
   /**
@@ -61,7 +61,7 @@ export class GoogleAuthHelper {
    * @throws {ProviderError} If required fields are missing.
    */
   private validateServiceAccountKey(): void {
-    const required = ['client_email', 'private_key'];
+    const required: (keyof ServiceAccountKey)[] = ['client_email', 'private_key'];
     const missing = required.filter(field => !this.serviceAccountKey[field]);
 
     if (missing.length > 0) {
@@ -72,7 +72,7 @@ export class GoogleAuthHelper {
   }
 
   /**
-   * Creates a JWT auth client that impersonates a specific user.
+   * Creates a GoogleAuth client that impersonates a specific user.
    *
    * Domain-wide delegation steps:
    * - Service account authenticates as itself.
@@ -80,19 +80,20 @@ export class GoogleAuthHelper {
    * - All API calls appear to come from that user.
    *
    * @param impersonateEmail Email of the user to impersonate.
-   * @returns Authenticated JWT client.
+   * @returns Authenticated GoogleAuth client.
    * @throws {ProviderError} If the client cannot be created.
    */
-  createAuthClient(impersonateEmail: string): JWT {
+  private createAuthClient(impersonateEmail: string): GoogleAuth {
     try {
-      const jwtClient = new google.auth.JWT({
-        email: this.serviceAccountKey.client_email,
-        key: this.serviceAccountKey.private_key,
+      const auth = new GoogleAuth({
+        credentials: this.serviceAccountKey,
         scopes: this.scopes,
-        subject: impersonateEmail, // Impersonation
+        clientOptions: {
+          subject: impersonateEmail, // Impersonation
+        },
       });
 
-      return jwtClient;
+      return auth;
     } catch (error) {
       throw new ProviderError(
         `Failed to create auth client for user: ${impersonateEmail}`,
@@ -110,18 +111,20 @@ export class GoogleAuthHelper {
    * @returns Google Drive v3 API client.
    * @throws {ProviderError} If the client cannot be created.
    */
-  createDriveClient(impersonateEmail: string): drive_v3.Drive {
+  async createDriveClient(impersonateEmail: string): Promise<drive_v3.Drive> {
+    // Check cache first
     if (this.driveClientCache.has(impersonateEmail)) {
       return this.driveClientCache.get(impersonateEmail)!;
     }
 
     // Create new client
-    try {
-      const auth = this.createAuthClient(impersonateEmail);
-      const driveClient = google.drive({
-        version: 'v3',
-        auth: auth,
-      });
+      try {
+        const auth = this.createAuthClient(impersonateEmail);
+        
+        const driveClient = google.drive({
+          version: 'v3',
+          auth: auth,
+        });
 
       // Cache the client
       this.driveClientCache.set(impersonateEmail, driveClient);
@@ -141,4 +144,18 @@ export class GoogleAuthHelper {
   getAdminEmail(): string {
     return this.adminEmail;
   }
+
+  /**
+   * Creates an authenticated Google Drive API client for the admin user.
+   * 
+   * This is a convenience method that automatically uses the admin email
+   * configured during initialization.
+   * 
+   * @returns Google Drive v3 API client authenticated as admin.
+   */
+  async createAdminDriveClient(): Promise<drive_v3.Drive> {
+    return this.createDriveClient(this.adminEmail);
+  }
+
+
 }
