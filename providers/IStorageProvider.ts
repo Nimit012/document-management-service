@@ -10,7 +10,7 @@ import {
    * regardless of the underlying storage technology.
    *
    * All operations are performed as the admin user (who owns all documents).
-   * Only the `copyDocument` method uses `source_owner` to impersonate for accessing source documents.
+   * Only the `copyDocumentFromSource` method uses `source_owner` to impersonate for accessing source documents.
    */
   export interface IStorageProvider {
     // ==================== DOCUMENT OPERATIONS ====================
@@ -29,6 +29,6 @@ import {
      * @param request The document creation request, including impersonation details and metadata.
      * @returns A promise resolving to the created document with its metadata.
      */
-    copyDocument(request: CreateDocumentRequest): Promise<Document>;
+    copyDocumentFromSource(request: CreateDocumentRequest): Promise<Document>;
 
   }

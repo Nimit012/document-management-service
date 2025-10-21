@@ -23,16 +23,10 @@ export class GoogleDriveProvider implements IStorageProvider {
   private operations: DocumentOperations;
 
   /**
-   * Provider-specific configuration.
-   */
-  private config: GoogleDriveConfig;
-
-  /**
    * Constructs a new GoogleDriveProvider instance.
    * @param config The configuration object for Google Drive integration.
    */
   constructor(config: GoogleDriveConfig) {
-    this.config = config;
     this.authHelper = new GoogleAuthHelper(config);
     this.operations = new DocumentOperations(this.authHelper);
   }
@@ -53,7 +47,7 @@ export class GoogleDriveProvider implements IStorageProvider {
    * @returns The created Document object.
    * @throws {ProviderError} If any step fails during the process.
    */
-  async copyDocument(request: CreateDocumentRequest): Promise<Document> {
+  async copyDocumentFromSource(request: CreateDocumentRequest): Promise<Document> {
     try {
  
       // 1. Copy document
@@ -72,22 +66,18 @@ export class GoogleDriveProvider implements IStorageProvider {
         await this.operations.moveToFolder(copiedFile.id!, folderId);
       }
 
-      // 4. Set permissions
+      // 4. Set permissions (if specified)
       if (request.access_control && request.access_control.length > 0) {
         await this.operations.setPermissions(copiedFile.id!, request.access_control);
       }
 
       // 5. Transform to Document
-      return this._transformToDocument(copiedFile);
+      return this._toDocumentObject(copiedFile);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new ProviderError(`Failed to create document: ${errorMessage}`, error);
     }
   }
-
-
-
-
 
 
   // ==================== HELPER METHODS ====================
@@ -98,7 +88,7 @@ export class GoogleDriveProvider implements IStorageProvider {
    * @param file The Google Drive file to convert.
    * @returns The corresponding Document object.
    */
-  private _transformToDocument(file: drive_v3.Schema$File): Document {
+  private _toDocumentObject(file: drive_v3.Schema$File): Document {
     return {
       document_id: file.id!,
       provider: 'google_drive',
