@@ -1,6 +1,12 @@
 import { drive_v3 } from 'googleapis';
 import { IStorageProvider } from '../IStorageProvider';
-import { Document, CreateDocumentRequest, GoogleDriveConfig, ProviderError } from '../../src/types';
+import {
+  Document,
+  CreateDocumentRequest,
+  GoogleDriveConfig,
+  ProviderError,
+  AccessControl
+} from '../../src/types';
 import { GoogleAuthHelper } from './auth';
 import { DocumentOperations } from './operations';
 import { DocumentPermissions } from './permissions';
@@ -106,7 +112,7 @@ export class GoogleDriveProvider implements IStorageProvider {
   /**
    * Updates a document's name and/or metadata in Google Drive.
    * Always performed as admin (who owns all documents).
-   * 
+   *
    * @param documentId - ID of the document to update.
    * @param updates - Object containing the new name and/or metadata to set.
    * @returns The updated Document object.
@@ -136,6 +142,28 @@ export class GoogleDriveProvider implements IStorageProvider {
       throw new ProviderError(`Failed to update document: ${errorMessage}`, error);
     }
   }
+  /**
+   * Deletes a document permanently by its ID from Google Drive.
+   * Always performed as admin (who owns all documents).
+   *
+   * @param documentId - The unique identifier of the document to delete.
+   * @returns A promise that resolves when the document is deleted.
+   */
+  async deleteDocument(documentId: string): Promise<void> {
+    await this.operations.deleteDocument(documentId);
+  }
+
+  /**
+   * Sets access permissions for a document, replacing all existing non-owner permissions.
+   * Always performed as admin (who owns all documents).
+   *
+   * @param documentId - The unique identifier of the document to update permissions for.
+   * @param accessControl - Array of AccessControl rules to apply.
+   * @returns A promise that resolves when permissions are set.
+   */
+  async setPermissions(documentId: string, accessControl: AccessControl[]): Promise<void> {
+    await this.permissions.setPermissions(documentId, accessControl);
+  }
 
   // ==================== HELPER METHODS ====================
 
@@ -148,7 +176,7 @@ export class GoogleDriveProvider implements IStorageProvider {
   private _toDocumentObject(file: drive_v3.Schema$File): Document {
     // Convert Google Drive properties to metadata
     const metadata: Record<string, unknown> = {};
-    
+
     if (file.properties) {
       for (const [key, value] of Object.entries(file.properties)) {
         if (value !== null && value !== undefined) {

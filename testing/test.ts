@@ -3,7 +3,7 @@ import { ProviderType } from '../src/types/provider.types';
 // Replace with your actual Google Drive service account credentials
 const config: any = {
   serviceAccountKey: {
-  
+ 
   },
   adminEmail: "sarah.admin@greydls.com"
 };
@@ -73,6 +73,53 @@ async function testUpdateDocument() {
   }
 }
 
+async function testDeleteDocument() {
+  // Initialize DocumentManager
+  const docManager = new DocumentManager({
+    provider: ProviderType.GOOGLE_DRIVE,
+    config: config
+  });
+
+  try {
+    console.log('Creating a test document for deletion...');
+
+    const documentIdToDelete = '1codXWTIwhGvOLkHudyG75EB5KQlo_AURvYmdYjEMgkE'
+    
+
+    // Delete the document
+    console.log('Deleting document...');
+    await docManager.deleteDocument(documentIdToDelete);
+    console.log('✅ Document successfully deleted:', documentIdToDelete);
+ 
+    
+  } catch (error) {
+    console.error('Error in delete document test:', error);
+  }
+}
+
+async function testSetPermissions() {
+  // Initialize DocumentManager
+  const docManager = new DocumentManager({
+    provider: ProviderType.GOOGLE_DRIVE,
+    config: config
+  });
+
+  try {
+    // Use an existing document ID to set permissions on
+    const documentId = "17rgRPjXlZ7Juj9GTezjI0iUsFsET00eL5i0eVyCMpqg"; // Replace with a valid file ID
+
+    console.log('Setting permissions...');
+    await docManager.setAccessControl(documentId, [
+      { user: 'emma.student@greydls.com', access_level: 'read' },
+      { user: 'maria.teacher@greydls.com', access_level: 'comment' },
+      { user: 'nimit.jain@comprotechnologies.com', access_level: 'read_write' },
+    ]);
+    console.log('✅ Permissions set successfully on:', documentId);
+  } catch (error) {
+    console.error('Error setting permissions:', error);
+  }
+}
+
 // Run the tests
 async function runTests() {
   console.log('=== Running Document Management Tests ===\n');
@@ -84,7 +131,13 @@ async function runTests() {
   // await testCreateDocument();
   
   console.log('\n3. Testing updateDocument...');
-  await testUpdateDocument();
+  // await testUpdateDocument();
+  
+  console.log('\n4. Testing deleteDocument...');
+  // await testDeleteDocument();
+  
+  console.log('\n5. Testing setPermissions...');
+  await testSetPermissions();
   
   console.log('\n=== All tests completed ===');
 }
