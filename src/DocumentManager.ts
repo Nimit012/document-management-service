@@ -5,7 +5,8 @@ import {
   GoogleDriveConfig,
   ValidationError,
   ProviderType,
-  AccessControl
+  AccessControl,
+  SearchDocumentsResult
 } from './types';
 
 import { IStorageProvider } from '../providers/IStorageProvider';
@@ -112,5 +113,21 @@ export class DocumentManager {
     // validateDocumentId(documentId);
     // validateAccessControl(accessControl);
     return await this.provider.setPermissions(documentId, accessControl);
+  }
+
+  /**
+   * Lists or searches for documents matching the provided metadata filters.
+   *
+   * @param filters - An object containing metadata key-value pairs to filter documents.
+   * @param limit - The maximum number of documents to retrieve (default: 20).
+   * @param offset - The number of documents to skip before starting to collect the result set (default: 0).
+   * @returns A promise that resolves to a SearchDocumentsResult containing the found documents and any pagination info.
+   */
+  async listDocuments(
+    filters: Record<string, unknown>,
+    limit: number = 20,
+    pageToken?: string
+  ): Promise<SearchDocumentsResult> {
+    return await this.provider.searchByMetadata(filters, limit, pageToken);
   }
 }

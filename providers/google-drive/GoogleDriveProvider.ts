@@ -5,7 +5,8 @@ import {
   CreateDocumentRequest,
   GoogleDriveConfig,
   ProviderError,
-  AccessControl
+  AccessControl,
+  SearchDocumentsResult
 } from '../../src/types';
 import { GoogleAuthHelper } from './auth';
 import { DocumentOperations } from './operations';
@@ -61,9 +62,10 @@ export class GoogleDriveProvider implements IStorageProvider {
    * 2. Transfers ownership to admin.
    * 3. Creates the target folder structure if `folder_path` is provided and moves document.
    * 4. Sets permissions if `access_control` is specified.
-   * 5. Transforms the copied file into the Document format.
+   * 5. Sets metadata if `metadata` is specified.
+   * 6. Transforms the copied file into the Document format.
    *
-   * @param request The document creation request, including source reference, owner, name, folder path, and access control.
+   * @param request The document creation request, including source reference, owner, name, folder path, access control, and metadata.
    * @returns The created Document object.
    * @throws {ProviderError} If any step fails during the process.
    */
@@ -90,7 +92,12 @@ export class GoogleDriveProvider implements IStorageProvider {
         await this.permissions.setPermissions(copiedFile.id!, request.access_control);
       }
 
-      // 5. Transform to Document
+      // 5. Set metadata (if specified)
+      if (request.metadata) {
+        await this.metadata.setMetadata(copiedFile.id!, request.metadata);
+      }
+
+      // 6. Transform to Document
       return this._toDocumentObject(copiedFile);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -163,6 +170,25 @@ export class GoogleDriveProvider implements IStorageProvider {
    */
   async setPermissions(documentId: string, accessControl: AccessControl[]): Promise<void> {
     await this.permissions.setPermissions(documentId, accessControl);
+  }
+
+
+  
+  /**
+   * Searches for documents by metadata filters in Google Drive.
+   * Always performed as admin (who owns all documents).
+   *
+   * @param filters - Key-value pairs of metadata fields to filter.
+   * @param limit - Maximum number of documents to return (default: 20).
+   * @param offset - Pagination offset (default: 0).
+   * @returns A promise resolving to a SearchDocumentsResult with found documents.
+   */
+  async searchByMetadata(
+    filters: Record<string, unknown>,
+    limit: number = 20,
+    pageToken?: string
+  ): Promise<SearchDocumentsResult> {
+    return await this.metadata.searchByMetadata(filters, limit, pageToken);
   }
 
   // ==================== HELPER METHODS ====================
