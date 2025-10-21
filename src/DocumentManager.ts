@@ -4,7 +4,8 @@ import {
   CreateDocumentRequest,
   GoogleDriveConfig,
   ValidationError,
-  ProviderType
+  ProviderType,
+  AccessControl
 } from './types';
 
 import { IStorageProvider } from '../providers/IStorageProvider';
@@ -68,9 +69,6 @@ export class DocumentManager {
   }
 
   /**
-   * Update document name and/or metadata
-   */
-  /**
    * Updates a document's name and/or metadata.
    * Always performed as admin (who owns all documents).
    *
@@ -92,9 +90,6 @@ export class DocumentManager {
   }
 
   /**
-   * Delete document
-   */
-  /**
    * Deletes a document permanently by its document ID.
    * Always performed as admin (who owns all documents).
    *
@@ -104,5 +99,18 @@ export class DocumentManager {
   async deleteDocument(documentId: string): Promise<void> {
     // validateDocumentId(documentId);
     return await this.provider.deleteDocument(documentId);
+  }
+
+  /**
+   * Sets the access control (permissions) for a document, replacing all existing permissions.
+   *
+   * @param documentId - The unique identifier of the document to update permissions for.
+   * @param accessControl - An array of AccessControl objects specifying the new permissions.
+   * @returns A promise that resolves when permissions are set.
+   */
+  async setAccessControl(documentId: string, accessControl: AccessControl[]): Promise<void> {
+    // validateDocumentId(documentId);
+    // validateAccessControl(accessControl);
+    return await this.provider.setPermissions(documentId, accessControl);
   }
 }

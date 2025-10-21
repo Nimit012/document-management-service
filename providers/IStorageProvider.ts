@@ -1,4 +1,4 @@
-import { Document, CreateDocumentRequest } from '../src/types';
+import { Document, CreateDocumentRequest, AccessControl } from '../src/types';
 
 /**
  * Interface for all storage providers (Google Drive, S3, Azure, etc.).
@@ -57,4 +57,18 @@ export interface IStorageProvider {
    * @param documentId - Document identifier
    */
   deleteDocument(documentId: string): Promise<void>;
+
+  /**
+   * Set permissions on document (replaces all existing permissions except owner)
+   * Always performed as admin (who owns all documents)
+   *
+   * Flow:
+   * 1. List existing permissions
+   * 2. Remove all non-owner permissions
+   * 3. Create new permissions from access_control array
+   *
+   * @param documentId - Document identifier
+   * @param accessControl - Array of access control rules
+   */
+  setPermissions(documentId: string, accessControl: AccessControl[]): Promise<void>;
 }

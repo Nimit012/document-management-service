@@ -3,7 +3,7 @@ import { ProviderType } from '../src/types/provider.types';
 // Replace with your actual Google Drive service account credentials
 const config: any = {
   serviceAccountKey: {
-
+ 
   },
   adminEmail: "sarah.admin@greydls.com"
 };
@@ -97,6 +97,29 @@ async function testDeleteDocument() {
   }
 }
 
+async function testSetPermissions() {
+  // Initialize DocumentManager
+  const docManager = new DocumentManager({
+    provider: ProviderType.GOOGLE_DRIVE,
+    config: config
+  });
+
+  try {
+    // Use an existing document ID to set permissions on
+    const documentId = "17rgRPjXlZ7Juj9GTezjI0iUsFsET00eL5i0eVyCMpqg"; // Replace with a valid file ID
+
+    console.log('Setting permissions...');
+    await docManager.setAccessControl(documentId, [
+      { user: 'emma.student@greydls.com', access_level: 'read' },
+      { user: 'maria.teacher@greydls.com', access_level: 'comment' },
+      { user: 'nimit.jain@comprotechnologies.com', access_level: 'read_write' },
+    ]);
+    console.log('✅ Permissions set successfully on:', documentId);
+  } catch (error) {
+    console.error('Error setting permissions:', error);
+  }
+}
+
 // Run the tests
 async function runTests() {
   console.log('=== Running Document Management Tests ===\n');
@@ -111,7 +134,10 @@ async function runTests() {
   // await testUpdateDocument();
   
   console.log('\n4. Testing deleteDocument...');
-  await testDeleteDocument();
+  // await testDeleteDocument();
+  
+  console.log('\n5. Testing setPermissions...');
+  await testSetPermissions();
   
   console.log('\n=== All tests completed ===');
 }
