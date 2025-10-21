@@ -116,13 +116,13 @@ export class GoogleAuthHelper {
     }
 
     // Create new client
-      try {
-        const auth = this.createAuthClient(impersonateEmail);
-        
-        const driveClient = google.drive({
-          version: 'v3',
-          auth: auth,
-        });
+    try {
+      const auth = this.createAuthClient(impersonateEmail);
+      
+      const driveClient = google.drive({
+        version: 'v3',
+        auth: auth,
+      });
 
       // Cache the client
       this.driveClientCache.set(impersonateEmail, driveClient);
@@ -154,6 +154,4 @@ export class GoogleAuthHelper {
   async createAdminDriveClient(): Promise<drive_v3.Drive> {
     return this.createDriveClient(this.adminEmail);
   }
-
-
 }

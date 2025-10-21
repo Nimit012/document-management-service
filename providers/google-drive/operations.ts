@@ -5,13 +5,15 @@ import { AccessControl, ProviderError, NotFoundError } from '../../src/types';
 /**
  * Helper for Google Drive document operations.
  *
- * Provides core document operations for Google Drive:
- * - Copy documents with ownership transfer
- * - Set and get document permissions
- * - Create and manage folder structures
- * - Get document metadata
- * - Update document names
- * - Delete documents
+ * This class provides comprehensive document management capabilities for Google Drive:
+ * - Copy documents between users with ownership transfer
+ * - Set and retrieve document permissions (read, write, comment access)
+ * - Create nested folder structures and manage folder hierarchy
+ * - Move documents between folders
+ * - Handle authentication and impersonation for multi-user operations
+ *
+ * All operations are performed using Google Drive API v3 with proper error handling
+ * and support for domain-wide delegation to manage documents across user accounts.
  */
 export class DocumentOperations {
   /**
@@ -26,7 +28,6 @@ export class DocumentOperations {
    * @param sourceDocId Source document ID to copy from.
    * @param sourceOwnerEmail Email of the user who owns/can access the source.
    * @param newName Name for the copied document (optional).
-   * @param folderId Parent folder ID (optional).
    * @returns Copied file metadata as a Drive file object.
    * @throws {NotFoundError} If the source document is not found.
    * @throws {ProviderError} If the copy operation fails.
@@ -34,19 +35,19 @@ export class DocumentOperations {
   async copyDocument(
     sourceDocId: string,
     sourceOwnerEmail: string,
-    newName?: string,
+    newName?: string
   ): Promise<drive_v3.Schema$File> {
     try {
       const sourceDriveClient = await this.authHelper.createDriveClient(sourceOwnerEmail);
-      
+
       const copyResponse = await sourceDriveClient.files.copy({
         fileId: sourceDocId,
         requestBody: {
-          name: newName,
+          name: newName
         },
-        fields: 'id,name,webViewLink,createdTime,modifiedTime,mimeType', // return these fields in response
+        fields: 'id,name,webViewLink,createdTime,modifiedTime,mimeType' // return these fields in response
       });
-  
+
       return copyResponse.data;
     } catch (error: unknown) {
       if (error && typeof error === 'object' && 'code' in error && error.code === 404) {
@@ -60,13 +61,11 @@ export class DocumentOperations {
   /**
    * Transfers ownership of a document to the admin.
    *
+   * @param sourceOwnerEmail Email of the current document owner.
    * @param fileId The ID of the file to transfer ownership of.
    * @throws {ProviderError} If the ownership transfer fails.
    */
-  async transferToAdmin(
-    sourceOwnerEmail: string,
-    fileId: string,
-  ): Promise<void> {
+  async transferToAdmin(sourceOwnerEmail: string, fileId: string): Promise<void> {
     try {
       const adminEmail = this.authHelper.getAdminEmail();
       const sourceDriveClient = await this.authHelper.createDriveClient(sourceOwnerEmail);
@@ -76,31 +75,29 @@ export class DocumentOperations {
         requestBody: {
           role: 'owner',
           type: 'user',
-          emailAddress: adminEmail,
+          emailAddress: adminEmail
         },
-        transferOwnership: true,
+        transferOwnership: true
       });
-
 
       const adminDriveClient = await this.authHelper.createAdminDriveClient();
-    
+
       const permissions = await adminDriveClient.permissions.list({
         fileId: fileId,
-        fields: 'permissions(id,emailAddress,role)',
+        fields: 'permissions(id,emailAddress,role)'
       });
-  
+
       // Find teacher's permission
       const teacherPermission = permissions.data.permissions?.find(
-        p => p.emailAddress === sourceOwnerEmail
+        (p) => p.emailAddress === sourceOwnerEmail
       );
-  
+
       if (teacherPermission?.id) {
         await adminDriveClient.permissions.delete({
           fileId: fileId,
-          permissionId: teacherPermission.id,
+          permissionId: teacherPermission.id
         });
       }
-      
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new ProviderError(`Failed to transfer ownership to admin: ${errorMessage}`, error);
@@ -111,19 +108,16 @@ export class DocumentOperations {
    * Set permissions on a document
    * Replaces ALL existing permissions except owner
    * Always performed as admin
-   * 
+   *
    * Flow:
    * 1. Get all existing permissions
    * 2. Delete all non-owner permissions
    * 3. Create new permissions from accessControl array
-   * 
+   *
    * @param documentId - Document ID
    * @param accessControl - Array of access control rules
    */
-  async setPermissions(
-    documentId: string,
-    accessControl: AccessControl[]
-  ): Promise<void> {
+  async setPermissions(documentId: string, accessControl: AccessControl[]): Promise<void> {
     try {
       const adminDriveClient = await this.authHelper.createAdminDriveClient();
 
@@ -131,7 +125,7 @@ export class DocumentOperations {
       console.log(`📋 Getting existing permissions for ${documentId}...`);
       const existingPermissions = await adminDriveClient.permissions.list({
         fileId: documentId,
-        fields: 'permissions(id,role,emailAddress,type)',
+        fields: 'permissions(id,role,emailAddress,type)'
       });
 
       const permissions = existingPermissions.data.permissions || [];
@@ -149,7 +143,7 @@ export class DocumentOperations {
           try {
             await adminDriveClient.permissions.delete({
               fileId: documentId,
-              permissionId: permission.id,
+              permissionId: permission.id
             });
             console.log(`✅ Removed permission: ${permission.emailAddress} (${permission.role})`);
           } catch (error) {
@@ -161,16 +155,16 @@ export class DocumentOperations {
       // Step 3: Create new permissions
       console.log(`➕ Adding ${accessControl.length} new permissions...`);
       for (const ac of accessControl) {
-        const role = this.mapAccessLevelToRole(ac.access_level);
+        const role = this._mapAccessLevelToRole(ac.access_level);
 
         await adminDriveClient.permissions.create({
           fileId: documentId,
           requestBody: {
             role: role,
             type: 'user',
-            emailAddress: ac.user,
+            emailAddress: ac.user
           },
-          sendNotificationEmail: false, // Don't spam users with emails
+          sendNotificationEmail: false // Don't spam users with emails
         });
 
         console.log(`✅ Granted ${ac.access_level} access to ${ac.user}`);
@@ -193,7 +187,7 @@ export class DocumentOperations {
    * Get current permissions on a document
    * Excludes owner permission
    * Always performed as admin
-   * 
+   *
    * @param documentId - Document ID
    * @returns Array of access control rules
    */
@@ -203,7 +197,7 @@ export class DocumentOperations {
 
       const response = await adminDriveClient.permissions.list({
         fileId: documentId,
-        fields: 'permissions(id,role,emailAddress,type)',
+        fields: 'permissions(id,role,emailAddress,type)'
       });
 
       const permissions = response.data.permissions || [];
@@ -213,7 +207,7 @@ export class DocumentOperations {
         .filter((p) => p.role !== 'owner' && p.emailAddress)
         .map((p) => ({
           user: p.emailAddress!,
-          access_level: this.mapRoleToAccessLevel(p.role!),
+          access_level: this._mapRoleToAccessLevel(p.role!)
         }));
 
       return accessControl;
@@ -231,15 +225,15 @@ export class DocumentOperations {
 
   /**
    * Map our access level to Google Drive role
-   * 
+   *
    * @param accessLevel - Our access level (read, read_write, comment)
    * @returns Google Drive role (reader, writer, commenter)
    */
-  private mapAccessLevelToRole(accessLevel: string): string {
+  private _mapAccessLevelToRole(accessLevel: string): string {
     const mapping: Record<string, string> = {
       read: 'reader',
       read_write: 'writer',
-      comment: 'commenter',
+      comment: 'commenter'
     };
 
     const role = mapping[accessLevel];
@@ -254,15 +248,15 @@ export class DocumentOperations {
 
   /**
    * Map Google Drive role to our access level
-   * 
+   *
    * @param role - Google Drive role (reader, writer, commenter)
    * @returns Our access level (read, read_write, comment)
    */
-  private mapRoleToAccessLevel(role: string): 'read' | 'read_write' | 'comment' {
+  private _mapRoleToAccessLevel(role: string): 'read' | 'read_write' | 'comment' {
     const mapping: Record<string, 'read' | 'read_write' | 'comment'> = {
       reader: 'read',
       writer: 'read_write',
-      commenter: 'comment',
+      commenter: 'comment'
     };
 
     return mapping[role] || 'read'; // Default to read if unknown
@@ -270,17 +264,17 @@ export class DocumentOperations {
 
   /**
    * Create nested folder path
-   * 
+   *
    * Example: "us_history2/unit1/masters"
    * Creates:
    * - us_history2/ (if doesn't exist)
    * - us_history2/unit1/ (if doesn't exist)
    * - us_history2/unit1/masters/ (if doesn't exist)
-   * 
+   *
    * Returns: ID of the final folder (masters)
-   * 
+   *
    * Always performed as admin
-   * 
+   *
    * @param path - Folder path (e.g., "course/unit1/masters")
    * @returns ID of final folder in path
    */
@@ -296,8 +290,6 @@ export class DocumentOperations {
         throw new ProviderError('Folder path cannot be empty');
       }
 
-
-      
       const adminDriveClient = await this.authHelper.createAdminDriveClient();
 
       let parentId: string | null = null;
@@ -305,13 +297,9 @@ export class DocumentOperations {
       // Create each folder in the path
       for (const folderName of segments) {
         console.log(`📁 Processing folder: ${folderName} (parent: ${parentId || 'root'})`);
-        
-        parentId = await this.findOrCreateFolder(
-          adminDriveClient,
-          folderName,
-          parentId
-        );
-        
+
+        parentId = await this._findOrCreateFolder(adminDriveClient, folderName, parentId);
+
         console.log(`✅ Folder ready: ${folderName} (id: ${parentId})`);
       }
 
@@ -319,28 +307,25 @@ export class DocumentOperations {
       return parentId!;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new ProviderError(
-        `Failed to create folder path "${path}": ${errorMessage}`,
-        error
-      );
+      throw new ProviderError(`Failed to create folder path "${path}": ${errorMessage}`, error);
     }
   }
 
   /**
    * Find existing folder or create new one
-   * 
+   *
    * @param drive - Authenticated Drive client
    * @param folderName - Name of folder to find/create
    * @param parentId - Parent folder ID (null for root)
    * @returns Folder ID
    */
-  private async findOrCreateFolder(
+  private async _findOrCreateFolder(
     drive: drive_v3.Drive,
     folderName: string,
     parentId: string | null
   ): Promise<string> {
     // Step 1: Search for existing folder
-    const existingFolder = await this.findFolder(drive, folderName, parentId);
+    const existingFolder = await this._findFolder(drive, folderName, parentId);
 
     if (existingFolder) {
       console.log(`  ℹ️ Folder already exists: ${folderName}`);
@@ -349,18 +334,18 @@ export class DocumentOperations {
 
     // Step 2: Create new folder if not found
     console.log(`  ➕ Creating new folder: ${folderName}`);
-    return await this.createFolder(drive, folderName, parentId);
+    return await this._createFolder(drive, folderName, parentId);
   }
 
   /**
    * Search for existing folder
-   * 
+   *
    * @param drive - Authenticated Drive client
    * @param folderName - Folder name to search for
    * @param parentId - Parent folder ID (null for root)
    * @returns Folder ID if found, null otherwise
    */
-  private async findFolder(
+  private async _findFolder(
     drive: drive_v3.Drive,
     folderName: string,
     parentId: string | null
@@ -373,7 +358,7 @@ export class DocumentOperations {
       const queryParts = [
         `name='${escapedName}'`,
         `mimeType='application/vnd.google-apps.folder'`,
-        `trashed=false`,
+        `trashed=false`
       ];
 
       // Add parent condition
@@ -389,7 +374,7 @@ export class DocumentOperations {
       const response = await drive.files.list({
         q: query,
         fields: 'files(id,name)',
-        pageSize: 1, // We only need first match
+        pageSize: 1 // We only need first match
       });
 
       const folders = response.data.files || [];
@@ -408,13 +393,13 @@ export class DocumentOperations {
 
   /**
    * Create new folder
-   * 
+   *
    * @param drive - Authenticated Drive client
    * @param folderName - Name for new folder
    * @param parentId - Parent folder ID (null for root)
    * @returns New folder ID
    */
-  private async createFolder(
+  private async _createFolder(
     drive: drive_v3.Drive,
     folderName: string,
     parentId: string | null
@@ -422,12 +407,12 @@ export class DocumentOperations {
     const folderMetadata: drive_v3.Schema$File = {
       name: folderName,
       mimeType: 'application/vnd.google-apps.folder',
-      parents: parentId ? [parentId] : undefined,
+      parents: parentId ? [parentId] : undefined
     };
 
     const response = await drive.files.create({
       requestBody: folderMetadata,
-      fields: 'id,name',
+      fields: 'id,name'
     });
 
     if (!response.data || !response.data.id) {
@@ -437,44 +422,37 @@ export class DocumentOperations {
     return response.data.id;
   }
 
-
-
-
   /**
- * Moves a document to a specific folder.
- * Removes document from all current parent folders and places in new folder.
- * Must be called as the document owner.
- *
- * @param fileId The ID of the file to move.
- * @param folderId The ID of the destination folder.
- * @throws {ProviderError} If the move operation fails.
- */
-async moveToFolder(
-  fileId: string,
-  folderId: string
-): Promise<void> {
-  try {
-    const adminDriveClient = await this.authHelper.createAdminDriveClient();
-    
-    // Get current parents
-    const file = await adminDriveClient.files.get({
-      fileId: fileId,
-      fields: 'parents',
-    });
+   * Moves a document to a specific folder.
+   * Removes document from all current parent folders and places in new folder.
+   * Always performed as admin.
+   *
+   * @param fileId The ID of the file to move.
+   * @param folderId The ID of the destination folder.
+   * @throws {ProviderError} If the move operation fails.
+   */
+  async moveToFolder(fileId: string, folderId: string): Promise<void> {
+    try {
+      const adminDriveClient = await this.authHelper.createAdminDriveClient();
 
-    const previousParents = file.data.parents?.join(',') || '';
+      // Get current parents
+      const file = await adminDriveClient.files.get({
+        fileId: fileId,
+        fields: 'parents'
+      });
 
-    // Move file to new folder and remove from old parents
-    await adminDriveClient.files.update({
-      fileId: fileId,
-      addParents: folderId,
-      removeParents: previousParents,
-      fields: 'id,parents',
-    });
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    throw new ProviderError(`Failed to move document to folder: ${errorMessage}`, error);
+      const previousParents = file.data.parents?.join(',') || '';
+
+      // Move file to new folder and remove from old parents
+      await adminDriveClient.files.update({
+        fileId: fileId,
+        addParents: folderId,
+        removeParents: previousParents,
+        fields: 'id,parents'
+      });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new ProviderError(`Failed to move document to folder: ${errorMessage}`, error);
+    }
   }
-}
-
 }

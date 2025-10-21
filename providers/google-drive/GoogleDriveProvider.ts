@@ -22,8 +22,6 @@ export class GoogleDriveProvider implements IStorageProvider {
    */
   private operations: DocumentOperations;
 
-
-
   /**
    * Provider-specific configuration.
    */
@@ -45,10 +43,11 @@ export class GoogleDriveProvider implements IStorageProvider {
    * Copies a document in Google Drive according to the request details.
    *
    * Steps:
-   * 1. Creates the target folder structure if `folder_path` is provided.
-   * 2. Copies the source document, impersonating the source owner.
-   * 3. Sets permissions if `access_control` is specified.
-   * 4. Transforms the copied file into the Document format.
+   * 1. Copies the source document, impersonating the source owner.
+   * 2. Transfers ownership to admin.
+   * 3. Creates the target folder structure if `folder_path` is provided and moves document.
+   * 4. Sets permissions if `access_control` is specified.
+   * 5. Transforms the copied file into the Document format.
    *
    * @param request The document creation request, including source reference, owner, name, folder path, and access control.
    * @returns The created Document object.
@@ -67,15 +66,12 @@ export class GoogleDriveProvider implements IStorageProvider {
       // 2. Transfer ownership to admin
       await this.operations.transferToAdmin(request.source_owner, copiedFile.id!);
 
-
-    // Step 3: Move to folder (if specified)
-
+      // 3. Move to folder (if specified)
       if (request.folder_path) {
         const folderId = await this.operations.createPath(request.folder_path);
         await this.operations.moveToFolder(copiedFile.id!, folderId);
       }
 
-      
       // 4. Set permissions
       if (request.access_control && request.access_control.length > 0) {
         await this.operations.setPermissions(copiedFile.id!, request.access_control);
@@ -114,7 +110,4 @@ export class GoogleDriveProvider implements IStorageProvider {
     };
   }
 
-
-
-  
 }
