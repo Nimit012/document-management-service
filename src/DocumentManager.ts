@@ -71,6 +71,14 @@ export class DocumentManager {
     /**
      * Update document name and/or metadata
      */
+    /**
+     * Updates a document's name and/or metadata.
+     * Always performed as admin (who owns all documents).
+     * 
+     * @param documentId - ID of the document to update.
+     * @param updates - Object containing the new name and/or metadata to set.
+     * @returns The updated Document object.
+     */
     async updateDocument(
       documentId: string,
       updates: { name?: string; metadata?: Record<string, unknown> }

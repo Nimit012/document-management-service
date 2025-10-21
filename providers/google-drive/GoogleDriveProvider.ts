@@ -103,6 +103,14 @@ export class GoogleDriveProvider implements IStorageProvider {
     return this._toDocumentObject(file);
   }
 
+  /**
+   * Updates a document's name and/or metadata in Google Drive.
+   * Always performed as admin (who owns all documents).
+   * 
+   * @param documentId - ID of the document to update.
+   * @param updates - Object containing the new name and/or metadata to set.
+   * @returns The updated Document object.
+   */
   async updateDocument(
     documentId: string,
     updates: { name?: string; metadata?: Record<string, unknown> }
