@@ -92,6 +92,37 @@ export class DocumentOperations {
   }
 
   /**
+   * Update document name
+   * Always performed as admin
+   *
+   * @param documentId - Document ID
+   * @param newName - New document name
+   */
+  async updateName(documentId: string, newName: string): Promise<void> {
+    try {
+      const adminDriveClient = await this.authHelper.createAdminDriveClient();
+
+      await adminDriveClient.files.update({
+        fileId: documentId,
+        requestBody: {
+          name: newName
+        }
+      });
+
+      console.log(`✅ Document name updated: ${newName}`);
+    } catch (error: unknown) {
+      if (error && typeof error === 'object' && 'code' in error && error.code === 404) {
+        throw new NotFoundError('Document', documentId);
+      }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new ProviderError(
+        `Failed to update document name ${documentId}: ${errorMessage}`,
+        error
+      );
+    }
+  }
+
+  /**
    * Create nested folder path
    *
    * Example: "us_history2/unit1/masters"

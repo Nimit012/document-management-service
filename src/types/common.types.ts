@@ -3,14 +3,13 @@
  */
 export interface Document {
     document_id: string;
-    provider: string;
     storage_reference: string;
     name: string;
     access_url: string;
     folder_path?: string;
     created_at: string;
     updated_at?: string;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
   }
   
 
@@ -23,7 +22,7 @@ export interface CreateDocumentRequest {
   name?: string;
   folder_path?: string;
   access_control?: AccessControl[];
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
   
   /**
@@ -67,7 +66,7 @@ export interface CreateDocumentRequest {
    * Search/list parameters
    */
   export interface SearchDocumentsParams {
-    filters?: Record<string, any>;
+    filters?: Record<string, unknown>;
     limit?: number;
     offset?: number;
   }

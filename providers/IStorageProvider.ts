@@ -39,4 +39,22 @@ import {
    * @returns Document with current metadata
    */
   getDocument(documentId: string): Promise<Document>;
+
+
+      /**
+     * Update document name and/or metadata
+     * Always performed as admin (who owns all documents)
+     * 
+     * @param documentId - Document identifier
+     * @param updates - Partial document updates (name, metadata)
+     * @returns Updated document
+     */
+      updateDocument(
+        documentId: string,
+        updates: { name?: string; metadata?: Record<string, unknown> }
+      ): Promise<Document>;
+
+
 }
+
+

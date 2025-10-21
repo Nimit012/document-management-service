@@ -4,4 +4,3 @@ coverage/
 .env
 dist
 cdk.out
-testing/

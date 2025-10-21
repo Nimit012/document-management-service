@@ -67,7 +67,7 @@ export class GoogleDriveProvider implements IStorageProvider {
       const copiedFile = await this.operations.copyDocument(
         request.source_reference,
         request.source_owner,
-        request.name,
+        request.name
       );
 
       // 2. Transfer ownership to admin
@@ -103,6 +103,32 @@ export class GoogleDriveProvider implements IStorageProvider {
     return this._toDocumentObject(file);
   }
 
+  async updateDocument(
+    documentId: string,
+    updates: { name?: string; metadata?: Record<string, unknown> }
+  ): Promise<Document> {
+    try {
+      // Update name if provided
+      if (updates.name) {
+        await this.operations.updateName(documentId, updates.name);
+      }
+
+      // Update metadata if provided
+      if (updates.metadata) {
+        // Merge with existing metadata
+        const existingMetadata = await this.metadata.getMetadata(documentId);
+        const mergedMetadata = { ...existingMetadata, ...updates.metadata };
+        await this.metadata.setMetadata(documentId, mergedMetadata);
+      }
+
+      // Return updated document
+      return await this.getDocument(documentId);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new ProviderError(`Failed to update document: ${errorMessage}`, error);
+    }
+  }
+
   // ==================== HELPER METHODS ====================
 
   /**
@@ -112,14 +138,30 @@ export class GoogleDriveProvider implements IStorageProvider {
    * @returns The corresponding Document object.
    */
   private _toDocumentObject(file: drive_v3.Schema$File): Document {
+    // Convert Google Drive properties to metadata
+    const metadata: Record<string, unknown> = {};
+    
+    if (file.properties) {
+      for (const [key, value] of Object.entries(file.properties)) {
+        if (value !== null && value !== undefined) {
+          // Try to parse JSON values, otherwise keep as string
+          try {
+            metadata[key] = JSON.parse(value);
+          } catch {
+            metadata[key] = value;
+          }
+        }
+      }
+    }
+
     return {
       document_id: file.id!,
-      provider: 'google_drive',
       storage_reference: file.id!,
       name: file.name || 'Untitled',
       access_url: file.webViewLink || `https://docs.google.com/document/d/${file.id}/edit`,
       created_at: file.createdTime || new Date().toISOString(),
       updated_at: file.modifiedTime || undefined,
+      metadata: Object.keys(metadata).length > 0 ? metadata : undefined
     };
   }
 }
