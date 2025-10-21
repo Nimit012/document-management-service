@@ -3,12 +3,14 @@ import { IStorageProvider } from '../IStorageProvider';
 import { Document, CreateDocumentRequest, GoogleDriveConfig, ProviderError } from '../../src/types';
 import { GoogleAuthHelper } from './auth';
 import { DocumentOperations } from './operations';
+import { DocumentPermissions } from './permissions';
+import { DocumentMetadata } from './metadata';
 
 /**
  * Google Drive Storage Provider implementation.
  *
  * Implements the {@link IStorageProvider} interface for Google Drive.
- * Orchestrates all helper modules (auth, operations, permissions, metadata, folders)
+ * Orchestrates authentication, document operations, permissions, and metadata
  * to provide complete document management functionality.
  */
 export class GoogleDriveProvider implements IStorageProvider {
@@ -18,9 +20,19 @@ export class GoogleDriveProvider implements IStorageProvider {
   private authHelper: GoogleAuthHelper;
 
   /**
-   * Handles document-level operations (copy, move, permissions, folders, etc.).
+   * Handles document-level operations (copy, move, get, folder management).
    */
   private operations: DocumentOperations;
+
+  /**
+   * Handles permission and ownership operations.
+   */
+  private permissions: DocumentPermissions;
+
+  /**
+   * Handles metadata operations.
+   */
+  private metadata: DocumentMetadata;
 
   /**
    * Constructs a new GoogleDriveProvider instance.
@@ -29,6 +41,8 @@ export class GoogleDriveProvider implements IStorageProvider {
   constructor(config: GoogleDriveConfig) {
     this.authHelper = new GoogleAuthHelper(config);
     this.operations = new DocumentOperations(this.authHelper);
+    this.permissions = new DocumentPermissions(this.authHelper);
+    this.metadata = new DocumentMetadata(this.authHelper);
   }
 
   // ==================== DOCUMENT OPERATIONS ====================
@@ -49,7 +63,6 @@ export class GoogleDriveProvider implements IStorageProvider {
    */
   async copyDocumentFromSource(request: CreateDocumentRequest): Promise<Document> {
     try {
- 
       // 1. Copy document
       const copiedFile = await this.operations.copyDocument(
         request.source_reference,
@@ -58,7 +71,7 @@ export class GoogleDriveProvider implements IStorageProvider {
       );
 
       // 2. Transfer ownership to admin
-      await this.operations.transferToAdmin(request.source_owner, copiedFile.id!);
+      await this.permissions.transferToAdmin(request.source_owner, copiedFile.id!);
 
       // 3. Move to folder (if specified)
       if (request.folder_path) {
@@ -68,7 +81,7 @@ export class GoogleDriveProvider implements IStorageProvider {
 
       // 4. Set permissions (if specified)
       if (request.access_control && request.access_control.length > 0) {
-        await this.operations.setPermissions(copiedFile.id!, request.access_control);
+        await this.permissions.setPermissions(copiedFile.id!, request.access_control);
       }
 
       // 5. Transform to Document
@@ -79,7 +92,6 @@ export class GoogleDriveProvider implements IStorageProvider {
     }
   }
 
-
   /**
    * Retrieves a document's metadata from Google Drive and transforms it into the Document format.
    *
@@ -87,13 +99,9 @@ export class GoogleDriveProvider implements IStorageProvider {
    * @returns The corresponding Document object in the internal format.
    */
   async getDocument(documentId: string): Promise<Document> {
-    // Fetch the file's metadata from Google Drive via the operations helper
     const file = await this.operations.getDocument(documentId);
-    // Transform the Google Drive file object into the application's Document type
-    return await this._transformToDocument(file);
+    return this._toDocumentObject(file);
   }
-
-
 
   // ==================== HELPER METHODS ====================
 
@@ -114,5 +122,4 @@ export class GoogleDriveProvider implements IStorageProvider {
       updated_at: file.modifiedTime || undefined,
     };
   }
-
 }
