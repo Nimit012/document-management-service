@@ -54,7 +54,7 @@ export class DocumentManager {
    */
   async createDocument(request: CreateDocumentRequest): Promise<Document> {
     // validateCreateRequest(request);
-    return await this.provider.copyDocument(request);
+    return await this.provider.copyDocumentFromSource(request);
   }
 
   /**

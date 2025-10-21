@@ -1,32 +1,35 @@
-import { Document, CreateDocumentRequest } from '../src/types';
-
-/**
- * Interface for all storage providers (Google Drive, S3, Azure, etc.).
- *
- * Implementing this interface ensures a consistent API for document management operations,
- * regardless of the underlying storage technology.
- *
- * All operations are performed as the admin user (who owns all documents).
- * Only the `copyDocument` method uses `source_owner` to impersonate for accessing source documents.
- */
-export interface IStorageProvider {
-  // ==================== DOCUMENT OPERATIONS ====================
-
+import {
+    Document,
+    CreateDocumentRequest,
+  } from '../src/types';
+  
   /**
-   * Copies a document from a source reference to create a new document in the storage system.
+   * Interface for all storage providers (Google Drive, S3, Azure, etc.).
    *
-   * The method performs the following steps:
-   * 1. Impersonates `source_owner` to access the source document.
-   * 2. Copies the document to the target location.
-   * 3. Transfers ownership to the admin user.
-   * 4. Creates the folder structure if `folder_path` is provided.
-   * 5. Sets metadata as custom properties.
-   * 6. Grants permissions if `access_control` is provided.
+   * Implementing this interface ensures a consistent API for document management operations,
+   * regardless of the underlying storage technology.
    *
-   * @param request The document creation request, including impersonation details and metadata.
-   * @returns A promise resolving to the created document with its metadata.
+   * All operations are performed as the admin user (who owns all documents).
+   * Only the `copyDocumentFromSource` method uses `source_owner` to impersonate for accessing source documents.
    */
-  copyDocument(request: CreateDocumentRequest): Promise<Document>;
+  export interface IStorageProvider {
+    // ==================== DOCUMENT OPERATIONS ====================
+    
+    /**
+     * Copies a document from a source reference to create a new document in the storage system.
+     *
+     * The method performs the following steps:
+     * 1. Impersonates `source_owner` to access the source document.
+     * 2. Copies the document to the target location.
+     * 3. Transfers ownership to the admin user.
+     * 4. Creates the folder structure if `folder_path` is provided.
+     * 5. Sets metadata as custom properties.
+     * 6. Grants permissions if `access_control` is provided.
+     *
+     * @param request The document creation request, including impersonation details and metadata.
+     * @returns A promise resolving to the created document with its metadata.
+     */
+    copyDocumentFromSource(request: CreateDocumentRequest): Promise<Document>;
 
   /**
    * Get document metadata by ID

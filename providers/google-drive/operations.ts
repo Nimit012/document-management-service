@@ -6,11 +6,11 @@ import { AccessControl, ProviderError, NotFoundError } from '../../src/types';
  * Helper for Google Drive document operations.
  *
  * This class provides comprehensive document management capabilities for Google Drive:
- * - Copy documents between users with ownership transfer
- * - Set and retrieve document permissions (read, write, comment access)
- * - Create nested folder structures and manage folder hierarchy
- * - Move documents between folders
- * - Handle authentication and impersonation for multi-user operations
+ *  - Copy documents between users with ownership transfer
+ *  - Set and retrieve document permissions (read, write, comment access)
+ *  - Create nested folder structures and manage folder hierarchy
+ *  - Move documents between folders
+ *  - Handle authentication and impersonation for multi-user operations
  *
  * All operations are performed using Google Drive API v3 with proper error handling
  * and support for domain-wide delegation to manage documents across user accounts.
