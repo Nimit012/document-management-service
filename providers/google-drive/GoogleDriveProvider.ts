@@ -80,6 +80,21 @@ export class GoogleDriveProvider implements IStorageProvider {
   }
 
 
+  /**
+   * Retrieves a document's metadata from Google Drive and transforms it into the Document format.
+   *
+   * @param documentId - The unique identifier of the Google Drive document.
+   * @returns The corresponding Document object in the internal format.
+   */
+  async getDocument(documentId: string): Promise<Document> {
+    // Fetch the file's metadata from Google Drive via the operations helper
+    const file = await this.operations.getDocument(documentId);
+    // Transform the Google Drive file object into the application's Document type
+    return await this._transformToDocument(file);
+  }
+
+
+
   // ==================== HELPER METHODS ====================
 
   /**

@@ -31,4 +31,12 @@ import {
      */
     copyDocumentFromSource(request: CreateDocumentRequest): Promise<Document>;
 
-  }
+  /**
+   * Get document metadata by ID
+   * Always performed as admin (who owns all documents)
+   *
+   * @param documentId - Document identifier
+   * @returns Document with current metadata
+   */
+  getDocument(documentId: string): Promise<Document>;
+}

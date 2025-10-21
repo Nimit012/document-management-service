@@ -4,7 +4,7 @@ import {
   CreateDocumentRequest,
   GoogleDriveConfig,
   ValidationError,
-  ProviderType,
+  ProviderType
 } from './types';
 
 import { IStorageProvider } from '../providers/IStorageProvider';
@@ -15,10 +15,9 @@ import { IStorageProvider } from '../providers/IStorageProvider';
  * @property config Provider-specific configuration. Currently only GoogleDriveConfig is supported.
  */
 interface DocumentManagerConfig {
- 
   /** The type of storage provider to use. */
   provider: ProviderType;
-  
+
   /** Provider-specific configuration. */
   config: GoogleDriveConfig; // Will be union type when S3 added
 }
@@ -28,7 +27,6 @@ interface DocumentManagerConfig {
  * Automatically instantiates the correct storage provider based on configuration.
  */
 export class DocumentManager {
-  
   /** The underlying storage provider instance. */
   private provider: IStorageProvider;
 
@@ -57,5 +55,15 @@ export class DocumentManager {
   async createDocument(request: CreateDocumentRequest): Promise<Document> {
     // validateCreateRequest(request);
     return await this.provider.copyDocumentFromSource(request);
+  }
+
+  /**
+   * Get document by ID
+   * @param documentId - The unique identifier of the document.
+   * @returns A promise resolving to the found Document object, if it exists.
+   */
+  async getDocument(documentId: string): Promise<Document> {
+    // validateDocumentId(documentId);
+    return await this.provider.getDocument(documentId);
   }
 }
