@@ -4,7 +4,7 @@ import {
   CreateDocumentRequest,
   GoogleDriveConfig,
   ValidationError,
-  ProviderType
+  ProviderType,
 } from './types';
 
 import { IStorageProvider } from '../providers/IStorageProvider';
@@ -66,4 +66,30 @@ export class DocumentManager {
     // validateDocumentId(documentId);
     return await this.provider.getDocument(documentId);
   }
+
+ 
+    /**
+     * Update document name and/or metadata
+     */
+    /**
+     * Updates a document's name and/or metadata.
+     * Always performed as admin (who owns all documents).
+     * 
+     * @param documentId - ID of the document to update.
+     * @param updates - Object containing the new name and/or metadata to set.
+     * @returns The updated Document object.
+     */
+    async updateDocument(
+      documentId: string,
+      updates: { name?: string; metadata?: Record<string, unknown> }
+    ): Promise<Document> {
+      // validateDocumentId(documentId);
+      
+      // if (updates.metadata) {
+      //   validateMetadata(updates.metadata);
+      // }
+      
+      return await this.provider.updateDocument(documentId, updates);
+    }
+
 }
