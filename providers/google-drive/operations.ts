@@ -59,6 +59,39 @@ export class DocumentOperations {
   }
 
   /**
+   * Get document metadata
+   * Always performed as admin
+   *
+   * @param documentId - Document ID
+   * @returns Document metadata
+   */
+  async getDocument(documentId: string): Promise<drive_v3.Schema$File> {
+    try {
+      const adminDriveClient = await this.authHelper.createAdminDriveClient();
+
+      const response = await adminDriveClient.files.get({
+        fileId: documentId,
+        fields: 'id,name,webViewLink,createdTime,modifiedTime,mimeType,properties'
+      });
+
+      if (!response.data) {
+        throw new NotFoundError('Document', documentId);
+      }
+
+      return response.data;
+    } catch (error: unknown) {
+      if (error && typeof error === 'object' && 'code' in error && error.code === 404) {
+        throw new NotFoundError('Document', documentId);
+      }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new ProviderError(
+        `Failed to set permissions on document ${documentId}: ${errorMessage}`,
+        error
+      );
+    }
+  }
+
+  /**
    * Transfers ownership of a document to the admin.
    *
    * @param sourceOwnerEmail Email of the current document owner.
