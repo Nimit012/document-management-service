@@ -49,4 +49,12 @@ export interface IStorageProvider {
     documentId: string,
     updates: { name?: string; metadata?: Record<string, unknown> }
   ): Promise<Document>;
+
+  /**
+   * Delete document permanently
+   * Always performed as admin (who owns all documents)
+   *
+   * @param documentId - Document identifier
+   */
+  deleteDocument(documentId: string): Promise<void>;
 }

@@ -85,7 +85,7 @@ export class DocumentOperations {
       }
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new ProviderError(
-        `Failed to set permissions on document ${documentId}: ${errorMessage}`,
+        `Failed to get document ${documentId}: ${errorMessage}`,
         error
       );
     }
@@ -119,6 +119,30 @@ export class DocumentOperations {
         `Failed to update document name ${documentId}: ${errorMessage}`,
         error
       );
+    }
+  }
+
+  /**
+   * Delete document permanently
+   * Always performed as admin
+   *
+   * @param documentId - Document ID
+   */
+  async deleteDocument(documentId: string): Promise<void> {
+    try {
+      const adminDriveClient = await this.authHelper.createAdminDriveClient();
+
+      await adminDriveClient.files.delete({
+        fileId: documentId
+      });
+
+      console.log(`🗑️ Document deleted: ${documentId}`);
+    } catch (error: unknown) {
+      if (error && typeof error === 'object' && 'code' in error && error.code === 404) {
+        throw new NotFoundError('Document', documentId);
+      }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new ProviderError(`Failed to delete document ${documentId}: ${errorMessage}`, error);
     }
   }
 

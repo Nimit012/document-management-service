@@ -106,7 +106,7 @@ export class GoogleDriveProvider implements IStorageProvider {
   /**
    * Updates a document's name and/or metadata in Google Drive.
    * Always performed as admin (who owns all documents).
-   * 
+   *
    * @param documentId - ID of the document to update.
    * @param updates - Object containing the new name and/or metadata to set.
    * @returns The updated Document object.
@@ -137,6 +137,10 @@ export class GoogleDriveProvider implements IStorageProvider {
     }
   }
 
+  async deleteDocument(documentId: string): Promise<void> {
+    await this.operations.deleteDocument(documentId);
+  }
+
   // ==================== HELPER METHODS ====================
 
   /**
@@ -148,7 +152,7 @@ export class GoogleDriveProvider implements IStorageProvider {
   private _toDocumentObject(file: drive_v3.Schema$File): Document {
     // Convert Google Drive properties to metadata
     const metadata: Record<string, unknown> = {};
-    
+
     if (file.properties) {
       for (const [key, value] of Object.entries(file.properties)) {
         if (value !== null && value !== undefined) {
