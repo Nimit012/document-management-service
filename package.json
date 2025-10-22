@@ -3,10 +3,18 @@
   "version": "1.0.0",
   "description": "Document management library for educational platforms",
   "main": "dist/index.js",
+  "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
   "scripts": {
-    "build": "tsc",
-    "watch": "tsc --watch",
+    "build": "tsup",
+    "build:watch": "tsup --watch",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
@@ -14,7 +22,9 @@
     "test:integration": "jest tests/integration",
     "test:e2e": "jest tests/e2e",
     "test:ci": "jest --coverage --ci --maxWorkers=2",
-    "prepublishOnly": "pnpm run build"
+    "prepublishOnly": "pnpm run build",
+    "dev": "tsup --watch",
+    "type-check": "tsc --noEmit"
   },
   "keywords": [],
   "author": "Nimit Jain",
@@ -29,6 +39,7 @@
     "prettier": "^3.6.2",
     "ts-jest": "^29.4.5",
     "ts-node": "^10.9.2",
+    "tsup": "^8.5.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.0"
   },

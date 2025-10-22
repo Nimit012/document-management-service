@@ -57,7 +57,6 @@ export class DocumentManager {
    * @returns The created Document object.
    */
   async createDocument(request: CreateDocumentRequest): Promise<Document> {
-    // validateCreateRequest(request);
     return await this.provider.copyDocumentFromSource(request);
   }
 
@@ -67,7 +66,6 @@ export class DocumentManager {
    * @returns A promise resolving to the found Document object, if it exists.
    */
   async getDocument(documentId: string): Promise<Document> {
-    // validateDocumentId(documentId);
     return await this.provider.getDocument(documentId);
   }
 
@@ -83,12 +81,6 @@ export class DocumentManager {
     documentId: string,
     updates: { name?: string; metadata?: Record<string, unknown> }
   ): Promise<Document> {
-    // validateDocumentId(documentId);
-
-    // if (updates.metadata) {
-    //   validateMetadata(updates.metadata);
-    // }
-
     return await this.provider.updateDocument(documentId, updates);
   }
 
@@ -100,7 +92,6 @@ export class DocumentManager {
    * @returns A promise that resolves when the document is deleted.
    */
   async deleteDocument(documentId: string): Promise<void> {
-    // validateDocumentId(documentId);
     return await this.provider.deleteDocument(documentId);
   }
 
@@ -112,8 +103,6 @@ export class DocumentManager {
    * @returns A promise that resolves when permissions are set.
    */
   async setAccessControl(documentId: string, accessControl: AccessControl[]): Promise<void> {
-    // validateDocumentId(documentId);
-    // validateAccessControl(accessControl);
     return await this.provider.setPermissions(documentId, accessControl);
   }
 
@@ -143,7 +132,6 @@ export class DocumentManager {
    * @throws Error if comments are not supported by the underlying provider.
    */
   async getComments(documentId: string): Promise<Comment[]> {
-    // validateDocumentId(documentId);
     
     if (!this.provider.getComments) {
       throw new Error('Comments not supported by this provider');
@@ -161,7 +149,6 @@ export class DocumentManager {
    * @throws Error if revisions are not supported by the underlying provider.
    */
   async getRevisions(documentId: string): Promise<Revision[]> {
-    // validateDocumentId(documentId);
     
     if (!this.provider.getRevisions) {
       throw new Error('Revisions not supported by this provider');

@@ -1,708 +1,1058 @@
-# Document Storage Library
+# Document Management Service 📄
 
-A TypeScript library for managing educational documents across multiple storage providers (Google Drive, S3, etc.). Provides a unified interface for document operations, access control, and metadata management.
+A comprehensive TypeScript library for managing documents across multiple cloud storage providers with advanced features like ownership transfer, permission management, metadata operations, and provider-specific integrations.
 
----
+## 🎯 Project Overview
 
-## 📁 Project Structure
+This service provides a unified interface for document management operations across multiple cloud storage providers, designed for educational platforms and enterprise environments. It handles complex workflows like copying documents from source users, transferring ownership to administrators, creating organized folder structures, and managing granular permissions.
+
+**Currently Supported Providers:**
+- ✅ **Google Drive** - Full implementation with domain-wide delegation
+- 🚧 **Amazon S3** - Planned for future releases
+
+**Provider-Agnostic Features:**
+- Unified API across all providers
+- Consistent error handling and types
+- Extensible architecture for adding new providers
+
+### Key Capabilities
+
+- **Document Operations**: Copy, move, create, update, and delete documents across providers
+- **Ownership Transfer**: Seamlessly transfer document ownership (Google Drive) or access control (S3)
+- **Permission Management**: Set granular access controls (read, write, comment) for individual users
+- **Metadata Operations**: Add custom properties and search documents by metadata
+- **Folder Management**: Create nested folder structures and organize documents
+- **Provider-Specific Features**: 
+  - Google Drive: Domain-wide delegation, comments, revisions
+  - S3: Bucket management, presigned URLs (planned)
+- **Pagination Support**: Token-based pagination for efficient large-scale operations
+- **Extensible Architecture**: Easy to add new storage providers
+
+## 🏗️ Architecture
+
+The service follows a modular architecture with clear separation of concerns:
 
 ```
-document-storage-lib/
-├── src/
-│   ├── index.ts                      # Main entry point - exports public API
-│   ├── DocumentManager.ts            # Main facade class
-│   └── types/                        # TypeScript type definitions
-│       ├── index.ts                  # Exports all types
-│       ├── common.types.ts           # Core types (Document, AccessControl, etc.)
-│       ├── provider.types.ts         # Provider configuration types
-│       └── errors.types.ts           # Error type definitions
-├── providers/                        # Storage provider implementations
-│   ├── IStorageProvider.ts          # Provider interface contract
-│   ├── google-drive/                # Google Drive implementation
-│   │   ├── GoogleDriveProvider.ts   # Main provider class
-│   │   ├── auth.ts                  # Authentication handling
-│   │   ├── folders.ts               # Folder hierarchy management
-│   │   ├── permissions.ts           # Access control mapping
-│   │   └── metadata.ts              # Custom properties handling
-│   └── s3/                          # S3 implementation (future)
-│       └── S3Provider.ts
-├── utils/                            # Utility functions
-│   ├── errors.ts                    # Custom error classes
-│   ├── validators.ts                # Input validation
-│   └── logger.ts                    # Logging utility
-├── examples/                         # Usage examples
-├── tests/                           # Test files
-├── package.json
-├── tsconfig.json
-└── README.md
+DocumentManager (Main Facade)
+    ↓
+Provider Selection
+    ↓
+┌─────────────────┬─────────────────┐
+│ GoogleDriveProvider │ S3Provider (Future) │
+│                 │                 │
+│ • Orchestrator  │ • Orchestrator  │
+│ • Auth Helper   │ • Auth Helper   │
+│ • Operations    │ • Operations    │
+│ • Permissions   │ • Permissions   │
+│ • Metadata      │ • Metadata      │
+└─────────────────┴─────────────────┘
+    ↓
+Provider-Specific APIs
+    ↓
+┌─────────────────┬─────────────────┐
+│ Google Drive API │ AWS S3 API      │
+└─────────────────┴─────────────────┘
 ```
 
----
+### Google Drive Implementation Details
 
-## 🗂️ File Descriptions
+```
+GoogleDriveProvider (Orchestrator)
+    ↓
+┌─────────────────┬─────────────────┬─────────────────┐
+│ DocumentOperations │ DocumentPermissions │ DocumentMetadata │
+│                 │                 │                 │
+│ • Copy/Move     │ • Ownership     │ • Set/Get       │
+│ • Folder Mgmt   │ • Permissions  │ • Search        │
+│ • CRUD Ops      │ • Access Ctrl  │ • Pagination    │
+└─────────────────┴─────────────────┴─────────────────┘
+    ↓
+GoogleAuthHelper (Authentication)
+    ↓
+Google Drive API v3
+```
 
-### Core Files
+### Component Interactions
 
-#### `src/index.ts`
-**Purpose:** Main entry point that exports the public API
+1. **DocumentManager** provides a unified interface and selects the appropriate provider
+2. **Provider Classes** (GoogleDriveProvider, S3Provider) act as orchestrators for their respective services
+3. **Operation Classes** handle provider-specific implementations:
+   - DocumentOperations: File-level operations (copy, move, folder creation)
+   - DocumentPermissions: Ownership transfers and access control
+   - DocumentMetadata: Custom properties and search functionality
+4. **Auth Helpers** provide provider-specific authentication
 
-**Exports:**
-- `DocumentManager` - Main class
-- All TypeScript types
-- Provider classes (GoogleDriveProvider, etc.)
-- Error classes
+### Provider-Specific Features
 
-**Usage:**
+#### Google Drive
+- **Domain-wide Delegation**: Service account can impersonate any user in your Google Workspace domain
+- **Ownership Transfer**: Seamlessly transfer document ownership between users
+- **Comments & Revisions**: Access to document comments and revision history
+- **Advanced Permissions**: Granular access control (read, write, comment)
+
+#### Amazon S3 (Planned)
+- **Bucket Management**: Create and manage S3 buckets
+- **Presigned URLs**: Generate secure, time-limited access URLs
+- **IAM Integration**: Use AWS IAM for permission management
+- **Metadata Storage**: Store custom metadata as S3 object tags
+
+## 📋 Prerequisites
+
+### Provider-Specific Requirements
+
+#### Google Drive Setup
+
+- **Google Workspace Admin Account**: Required to configure domain-wide delegation
+- **Service Account**: Must be created in Google Cloud Console with domain-wide delegation enabled
+- **OAuth Scopes**: The service account needs the following scope:
+  - `https://www.googleapis.com/auth/drive` (Full Drive access)
+
+#### Amazon S3 Setup (Future)
+
+- **AWS Account**: Active AWS account with S3 access
+- **IAM User/Role**: With appropriate S3 permissions
+- **Access Credentials**: AWS Access Key ID and Secret Access Key
+- **Bucket**: S3 bucket for document storage
+
+### Setup Steps
+
+#### Google Drive Setup
+
+1. **Create Service Account**:
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project or select existing one
+   - Enable Google Drive API
+   - Create a service account
+   - Download the service account key (JSON file)
+
+2. **Enable Domain-wide Delegation**:
+   - In Google Cloud Console, go to IAM & Admin → Service Accounts
+   - Click on your service account
+   - Go to "Advanced settings" → "Domain-wide delegation"
+   - Enable domain-wide delegation
+   - Note the Client ID
+
+3. **Configure in Google Workspace Admin**:
+   - Go to [Google Admin Console](https://admin.google.com/)
+   - Navigate to Security → API Controls
+   - Click "Domain-wide delegation"
+   - Add your service account's Client ID
+   - Add the scope: `https://www.googleapis.com/auth/drive`
+
+#### Amazon S3 Setup (Future)
+
+1. **Create S3 Bucket**:
+   - Go to [AWS S3 Console](https://console.aws.amazon.com/s3/)
+   - Create a new bucket
+   - Configure bucket permissions and policies
+
+2. **Create IAM User/Role**:
+   - Go to [AWS IAM Console](https://console.aws.amazon.com/iam/)
+   - Create user or role with S3 permissions
+   - Generate access credentials
+
+3. **Configure Bucket Policies**:
+   - Set up appropriate bucket policies for your use case
+   - Configure CORS if needed for web access
+
+## 📦 Installation
+
+### From GitHub Repository
+
+```bash
+# Using npm
+npm install git+https://github.com/yourusername/doc-management-service.git
+
+# Using yarn
+yarn add git+https://github.com/yourusername/doc-management-service.git
+
+# Using pnpm
+pnpm add git+https://github.com/yourusername/doc-management-service.git
+```
+
+### From NPM (when published)
+
+```bash
+# Using npm
+npm install document-management-service
+
+# Using yarn
+yarn add document-management-service
+
+# Using pnpm
+pnpm add document-management-service
+```
+
+### Dependencies
+
+The service requires the following peer dependencies:
+
+**Google Drive Provider:**
+- `googleapis` (^162.0.0)
+- `google-auth-library` (^10.4.0)
+
+**Amazon S3 Provider (Future):**
+- `@aws-sdk/client-s3` (^3.0.0)
+- `@aws-sdk/s3-request-presigner` (^3.0.0)
+
+## 🚀 Quick Start
+
+### Basic Setup and Usage
+
+Here's how to get started with the Document Management Service in your application:
+
 ```typescript
-import { DocumentManager, GoogleDriveProvider } from 'document-storage-lib';
+import { 
+  DocumentManager, 
+  ProviderType, 
+  GoogleDriveConfig,
+  CreateDocumentRequest,
+  AccessControl 
+} from 'document-management-service';
+
+// 1. Configure Google Drive (see Configuration section for details)
+const config: GoogleDriveConfig = {
+  serviceAccountKey: {
+    type: "service_account",
+    project_id: "your-project-id",
+    private_key_id: "your-private-key-id",
+    private_key: "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n",
+    client_email: "your-service-account@your-project.iam.gserviceaccount.com",
+    client_id: "your-client-id",
+    auth_uri: "https://accounts.google.com/o/oauth2/auth",
+    token_uri: "https://oauth2.googleapis.com/token",
+    auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
+    client_x509_cert_url: "https://www.googleapis.com/robot/v1/metadata/x509/your-service-account%40your-project.iam.gserviceaccount.com"
+  },
+  adminEmail: "admin@yourdomain.com"
+};
+
+// 2. Initialize the DocumentManager
+const docManager = new DocumentManager({
+  provider: ProviderType.GOOGLE_DRIVE,
+  config: config
+});
+
+// 3. Use the service
+async function example() {
+  try {
+    // Create a document from a source
+    const document = await docManager.createDocument({
+      source_reference: "1ABC123DEF456GHI789JKL", // Google Drive file ID
+      source_owner: "teacher@example.com", // Email of source owner
+      name: "Student Assignment Copy",
+      folder_path: "/assignments/unit1",
+      metadata: {
+        project: "History Project",
+        grade_level: 9
+      },
+      access_control: [
+        {
+          user: "student@example.com",
+          access_level: "read_write"
+        }
+      ]
+    });
+
+    console.log('Document created:', document.document_id);
+    console.log('Access URL:', document.access_url);
+
+    // Get the document
+    const retrievedDoc = await docManager.getDocument(document.document_id);
+    console.log('Retrieved document:', retrievedDoc.name);
+
+    // Search for documents
+    const results = await docManager.listDocuments(
+      { project: "History Project" },
+      10
+    );
+    console.log(`Found ${results.documents.length} documents`);
+
+  } catch (error) {
+    console.error('Error:', error);
+  }
+}
 ```
 
----
+### Environment Variables Setup
 
-#### `src/DocumentManager.ts`
-**Purpose:** Main facade class that provides a unified interface for all document operations
+For security, store your credentials in environment variables:
 
-**Responsibilities:**
-- Accepts a provider instance in constructor
-- Validates all inputs before delegating to provider
-- Provides type-safe methods for document operations
-- Handles error transformation
-
-**Key Methods:**
-- `createDocument()` - Create new document from source
-- `getDocument()` - Retrieve document by ID
-- `listDocuments()` - Search/filter documents
-- `updateDocument()` - Update document name/metadata
-- `deleteDocument()` - Delete document
-- `setAccessControl()` - Set permissions
-- `getAccessControl()` - Get current permissions
-- `getComments()` - Get comments (provider-specific)
-- `getRevisions()` - Get revision history (provider-specific)
-
-**Internal Flow:**
-```
-User calls method → Validate input → Delegate to provider → Return result
+```bash
+# .env file
+GOOGLE_DRIVE_PROJECT_ID=your-project-id
+GOOGLE_DRIVE_PRIVATE_KEY_ID=your-private-key-id
+GOOGLE_DRIVE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+GOOGLE_DRIVE_CLIENT_EMAIL=your-service-account@your-project.iam.gserviceaccount.com
+GOOGLE_DRIVE_CLIENT_ID=your-client-id
+GOOGLE_DRIVE_ADMIN_EMAIL=admin@yourdomain.com
 ```
 
----
-
-### Type Definitions
-
-#### `src/types/common.types.ts`
-**Purpose:** Core type definitions used throughout the library
-
-**Key Types:**
 ```typescript
-// Main document structure
+// Using environment variables
+const config: GoogleDriveConfig = {
+  serviceAccountKey: {
+    type: "service_account",
+    project_id: process.env.GOOGLE_DRIVE_PROJECT_ID!,
+    private_key_id: process.env.GOOGLE_DRIVE_PRIVATE_KEY_ID!,
+    private_key: process.env.GOOGLE_DRIVE_PRIVATE_KEY!,
+    client_email: process.env.GOOGLE_DRIVE_CLIENT_EMAIL!,
+    client_id: process.env.GOOGLE_DRIVE_CLIENT_ID!,
+    auth_uri: "https://accounts.google.com/o/oauth2/auth",
+    token_uri: "https://oauth2.googleapis.com/token",
+    auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
+    client_x509_cert_url: `https://www.googleapis.com/robot/v1/metadata/x509/${encodeURIComponent(process.env.GOOGLE_DRIVE_CLIENT_EMAIL!)}`
+  },
+  adminEmail: process.env.GOOGLE_DRIVE_ADMIN_EMAIL!
+};
+```
+
+### Complete Usage Examples
+
+#### Document Operations
+
+```typescript
+// Create a document
+const createRequest: CreateDocumentRequest = {
+  source_reference: "1ABC123DEF456GHI789JKL",
+  source_owner: "user@example.com",
+  name: "My New Document",
+  folder_path: "/Documents/Projects",
+  metadata: {
+    project: "My Project",
+    category: "Important",
+    tags: ["urgent", "review"]
+  },
+  access_control: [
+    {
+      user: "collaborator@example.com",
+      access_level: "read_write"
+    },
+    {
+      user: "reviewer@example.com", 
+      access_level: "comment"
+    }
+  ]
+};
+
+const document = await docManager.createDocument(createRequest);
+
+// Get a document
+const doc = await docManager.getDocument(document.document_id);
+
+// Update a document
+const updatedDoc = await docManager.updateDocument(document.document_id, {
+  name: "Updated Document Name",
+  metadata: {
+    project: "Updated Project",
+    status: "completed"
+  }
+});
+
+// Delete a document
+await docManager.deleteDocument(document.document_id);
+```
+
+#### Permission Management
+
+```typescript
+// Set document permissions
+const permissions: AccessControl[] = [
+  {
+    user: "student1@example.com",
+    access_level: "read_write"
+  },
+  {
+    user: "student2@example.com",
+    access_level: "read"
+  },
+  {
+    user: "teacher@example.com",
+    access_level: "comment"
+  }
+];
+
+await docManager.setAccessControl(document.document_id, permissions);
+```
+
+#### Search and Pagination
+
+```typescript
+// Search documents with pagination
+const result = await docManager.listDocuments(
+  { project: "My Project" }, // metadata filters
+  10, // limit
+  undefined // pageToken for pagination
+);
+
+console.log('Documents found:', result.documents);
+console.log('Next page token:', result.nextPageToken);
+
+// Get next page
+if (result.nextPageToken) {
+  const nextPage = await docManager.listDocuments(
+    { project: "My Project" },
+    10,
+    result.nextPageToken
+  );
+}
+```
+
+#### Google Drive Specific Features
+
+```typescript
+// Get document comments (Google Drive only)
+const comments = await docManager.getComments(document.document_id);
+comments.forEach(comment => {
+  console.log(`${comment.author}: ${comment.content}`);
+  if (comment.replies) {
+    comment.replies.forEach(reply => {
+      console.log(`  Reply from ${reply.author}: ${reply.content}`);
+    });
+  }
+});
+
+// Get document revision history (Google Drive only)
+const revisions = await docManager.getRevisions(document.document_id);
+revisions.forEach(revision => {
+  console.log(`Revision ${revision.revision_id} by ${revision.modified_by}`);
+  console.log(`Modified: ${revision.modified_time}`);
+});
+```
+
+#### Error Handling
+
+```typescript
+import { ValidationError } from 'document-management-service';
+
+try {
+  const document = await docManager.createDocument(request);
+} catch (error) {
+  if (error instanceof ValidationError) {
+    console.error('Validation error:', error.message);
+  } else {
+    console.error('Unexpected error:', error);
+  }
+}
+```
+
+### TypeScript Support
+
+The library provides full TypeScript support with:
+- Complete type definitions
+- IntelliSense support for all methods and interfaces
+- Type safety for all operations
+- Comprehensive error types
+
+### Available Methods
+
+| Method | Description | Parameters | Returns |
+|--------|-------------|------------|---------|
+| `createDocument` | Create a document from a source | `CreateDocumentRequest` | `Promise<Document>` |
+| `getDocument` | Retrieve a document by ID | `documentId: string` | `Promise<Document>` |
+| `updateDocument` | Update document name/metadata | `documentId: string`, `updates: object` | `Promise<Document>` |
+| `deleteDocument` | Delete a document | `documentId: string` | `Promise<void>` |
+| `setAccessControl` | Set document permissions | `documentId: string`, `accessControl: AccessControl[]` | `Promise<void>` |
+| `listDocuments` | Search documents by metadata | `filters: object`, `limit: number`, `pageToken?: string` | `Promise<SearchDocumentsResult>` |
+| `getComments` | Get document comments | `documentId: string` | `Promise<Comment[]>` |
+| `getRevisions` | Get document revision history | `documentId: string` | `Promise<Revision[]>` |
+
+### Build Configuration
+
+The library is built with **tsup** and provides:
+
+- **Dual format support**: Both CommonJS (`dist/index.js`) and ESM (`dist/index.mjs`)
+- **TypeScript definitions**: Complete type definitions (`dist/index.d.ts`)
+- **Source maps**: For debugging (`dist/index.js.map`, `dist/index.mjs.map`)
+- **Tree shaking**: Optimized for bundlers
+- **External dependencies**: Google APIs are marked as external
+
+This means the library works seamlessly in:
+- **Node.js** applications
+- **Modern bundlers** (Vite, Webpack, Rollup)
+- **TypeScript** projects with full IntelliSense
+- **Browser** environments (when bundled)
+
+### Package.json Configuration
+
+The library exports are configured for maximum compatibility:
+
+```json
+{
+  "main": "dist/index.js",
+  "module": "dist/index.mjs", 
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  }
+}
+```
+
+## ⚙️ Configuration
+
+### Provider Configuration
+
+#### Google Drive Configuration
+
+```typescript
+import { DocumentManager, ProviderType, GoogleDriveConfig } from 'document-management-service';
+
+// Load your service account key
+const serviceAccountKey = {
+  type: "service_account",
+  project_id: "your-project-id",
+  private_key_id: "your-private-key-id",
+  private_key: "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n",
+  client_email: "your-service-account@your-project.iam.gserviceaccount.com",
+  client_id: "your-client-id",
+  auth_uri: "https://accounts.google.com/o/oauth2/auth",
+  token_uri: "https://oauth2.googleapis.com/token",
+  auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
+  client_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs/your-service-account%40your-project.iam.gserviceaccount.com"
+};
+
+// Configure the service
+const config: GoogleDriveConfig = {
+  serviceAccountKey: serviceAccountKey,
+  adminEmail: 'admin@yourdomain.com' // The admin who will own all documents
+};
+
+// Initialize DocumentManager
+const documentManager = new DocumentManager({
+  provider: ProviderType.GOOGLE_DRIVE,
+  config: config
+});
+```
+
+#### Amazon S3 Configuration (Future)
+
+```typescript
+import { DocumentManager, ProviderType, S3Config } from 'document-management-service';
+
+// Configure S3 provider
+const s3Config: S3Config = {
+  region: 'us-east-1',
+  bucket: 'your-document-bucket',
+  accessKeyId: 'your-access-key-id',     // Optional if using IAM roles
+  secretAccessKey: 'your-secret-key'     // Optional if using IAM roles
+};
+
+// Initialize DocumentManager with S3
+const documentManager = new DocumentManager({
+  provider: ProviderType.S3,
+  config: s3Config
+});
+```
+
+### Configuration Types
+
+#### Google Drive Service Account Key Structure
+
+The service account key must include all required fields:
+
+```typescript
+interface ServiceAccountKey {
+  type: string;                    // "service_account"
+  project_id: string;             // Your Google Cloud project ID
+  private_key_id: string;         // Private key identifier
+  private_key: string;            // RSA private key (PEM format)
+  client_email: string;           // Service account email
+  client_id: string;              // OAuth client ID
+  auth_uri: string;              // OAuth authorization URI
+  token_uri: string;              // OAuth token URI
+  auth_provider_x509_cert_url: string;
+  client_x509_cert_url: string;
+}
+```
+
+#### Amazon S3 Configuration Structure
+
+```typescript
+interface S3Config {
+  region: string;                 // AWS region (e.g., 'us-east-1')
+  bucket: string;                 // S3 bucket name
+  accessKeyId?: string;           // AWS access key (optional with IAM roles)
+  secretAccessKey?: string;       // AWS secret key (optional with IAM roles)
+}
+```
+
+## 🚀 Usage Examples
+
+### Provider Selection
+
+```typescript
+import { DocumentManager, ProviderType } from 'document-management-service';
+
+// Choose your provider
+const provider = ProviderType.GOOGLE_DRIVE; // or ProviderType.S3 (when available)
+
+const documentManager = new DocumentManager({
+  provider: provider,
+  config: provider === ProviderType.GOOGLE_DRIVE ? googleDriveConfig : s3Config
+});
+```
+
+### Google Drive Examples
+
+#### Copy Document with Ownership Transfer
+
+```typescript
+import { DocumentManager, ProviderType, GoogleDriveConfig } from 'document-management-service';
+
+const documentManager = new DocumentManager({
+  provider: ProviderType.GOOGLE_DRIVE,
+  config: config
+});
+
+// Copy a document from a teacher's Drive and transfer ownership to admin
+const document = await documentManager.createDocument({
+  source_reference: '1ABC123def456GHI789jkl', // Google Drive file ID
+  source_owner: 'teacher@yourdomain.com',     // Teacher's email
+  name: 'Student Assignment Copy',             // New document name
+  folder_path: 'assignments/unit1/student_copies', // Optional folder structure
+  access_control: [                            // Optional permissions
+    {
+      user: 'student@yourdomain.com',
+      access_level: 'read_write'
+    },
+    {
+      user: 'teacher@yourdomain.com',
+      access_level: 'comment'
+    }
+  ],
+  metadata: {                                  // Optional custom metadata
+    activity_id: 'act_123',
+    document_type: 'student_copy',
+    grade_level: 9,
+    subject: 'history'
+  }
+});
+
+console.log('Document created:', document.document_id);
+console.log('Access URL:', document.access_url);
+```
+
+### Create Folder Structure
+
+```typescript
+// The service automatically creates nested folder structures
+const document = await documentManager.createDocument({
+  source_reference: '1ABC123def456GHI789jkl',
+  source_owner: 'teacher@yourdomain.com',
+  name: 'Lesson Plan',
+  folder_path: 'curriculum/us_history/unit1/lesson_plans' // Creates all folders
+});
+
+// Folders created:
+// - curriculum/
+// - curriculum/us_history/
+// - curriculum/us_history/unit1/
+// - curriculum/us_history/unit1/lesson_plans/
+```
+
+### Set Document Permissions
+
+```typescript
+// Set permissions on an existing document
+await documentManager.setAccessControl('1ABC123def456GHI789jkl', [
+  {
+    user: 'student1@yourdomain.com',
+    access_level: 'read_write'
+  },
+  {
+    user: 'student2@yourdomain.com',
+    access_level: 'read'
+  },
+  {
+    user: 'teacher@yourdomain.com',
+    access_level: 'comment'
+  }
+]);
+```
+
+### Search Documents by Metadata
+
+```typescript
+// Search for documents with specific metadata
+const results = await documentManager.listDocuments(
+  {
+    activity_id: 'act_123',
+    document_type: 'student_copy'
+  },
+  20, // limit
+  undefined // pageToken for pagination
+);
+
+console.log(`Found ${results.documents.length} documents`);
+results.documents.forEach(doc => {
+  console.log(`${doc.name}: ${doc.access_url}`);
+});
+
+// Handle pagination
+if (results.nextPageToken) {
+  const nextPage = await documentManager.listDocuments(
+    { activity_id: 'act_123' },
+    20,
+    results.nextPageToken
+  );
+}
+```
+
+### Get Document Metadata
+
+```typescript
+// Retrieve a document
+const document = await documentManager.getDocument('1ABC123def456GHI789jkl');
+
+// Update document metadata
+await documentManager.updateDocument('1ABC123def456GHI789jkl', {
+  name: 'Updated Document Name',
+  metadata: {
+    status: 'completed',
+    grade: 95,
+    feedback: 'Excellent work!'
+  }
+});
+```
+
+#### Access Comments and Revisions (Google Drive Only)
+
+```typescript
+// Get document comments (Google Drive only)
+const comments = await documentManager.getComments('1ABC123def456GHI789jkl');
+comments.forEach(comment => {
+  console.log(`${comment.author}: ${comment.content}`);
+  if (comment.replies) {
+    comment.replies.forEach(reply => {
+      console.log(`  Reply from ${reply.author}: ${reply.content}`);
+    });
+  }
+});
+
+// Get document revision history (Google Drive only)
+const revisions = await documentManager.getRevisions('1ABC123def456GHI789jkl');
+revisions.forEach(revision => {
+  console.log(`Revision ${revision.revision_id} by ${revision.modified_by}`);
+  console.log(`Modified: ${revision.modified_time}`);
+});
+```
+
+### Amazon S3 Examples (Future)
+
+#### Upload Document to S3
+
+```typescript
+// Upload a document to S3 (when S3 provider is implemented)
+const document = await documentManager.createDocument({
+  source_reference: 'local-file-path-or-url',
+  source_owner: 'system', // S3 doesn't have user ownership like Google Drive
+  name: 'Document.pdf',
+  folder_path: 'documents/2024/january', // S3 object key prefix
+  metadata: {
+    document_type: 'contract',
+    department: 'legal',
+    confidential: true
+  }
+});
+```
+
+#### Generate Presigned URLs (Future)
+
+```typescript
+// Generate presigned URL for secure access (when implemented)
+const presignedUrl = await documentManager.generatePresignedUrl(
+  'documents/contract.pdf',
+  { expiresIn: 3600 } // 1 hour
+);
+console.log('Secure access URL:', presignedUrl);
+```
+
+## 📚 API Reference
+
+### DocumentManager
+
+The main facade class that provides a unified interface for all document operations.
+
+#### Constructor
+
+```typescript
+constructor(options: DocumentManagerConfig)
+```
+
+#### Methods
+
+| Method | Description | Parameters | Returns |
+|--------|-------------|------------|---------|
+| `createDocument` | Copy document from source with ownership transfer | `CreateDocumentRequest` | `Promise<Document>` |
+| `getDocument` | Retrieve document by ID | `documentId: string` | `Promise<Document>` |
+| `updateDocument` | Update document name and/or metadata | `documentId: string`, `updates: object` | `Promise<Document>` |
+| `deleteDocument` | Permanently delete document | `documentId: string` | `Promise<void>` |
+| `setAccessControl` | Set document permissions | `documentId: string`, `accessControl: AccessControl[]` | `Promise<void>` |
+| `listDocuments` | Search documents by metadata | `filters: object`, `limit: number`, `pageToken?: string` | `Promise<SearchDocumentsResult>` |
+| `getComments` | Get document comments | `documentId: string` | `Promise<Comment[]>` |
+| `getRevisions` | Get document revision history | `documentId: string` | `Promise<Revision[]>` |
+
+### Types
+
+#### Document
+
+```typescript
 interface Document {
   document_id: string;
-  provider: string;
   storage_reference: string;
   name: string;
   access_url: string;
   folder_path?: string;
   created_at: string;
-  metadata?: Record<string, any>;
+  updated_at?: string;
+  metadata?: Record<string, unknown>;
 }
+```
 
-// Request to create document
+#### CreateDocumentRequest
+
+```typescript
 interface CreateDocumentRequest {
-  provider: 'google_drive' | 's3';
-  source_reference: string;
-  source_owner: string;
-  name?: string;
-  folder_path?: string;
-  access_control?: AccessControl[];
-  metadata?: Record<string, any>;
+  source_reference: string;        // Google Drive file ID
+  source_owner: string;           // Email of source document owner
+  name?: string;                  // New document name
+  folder_path?: string;          // Target folder path
+  access_control?: AccessControl[]; // Permissions to set
+  metadata?: Record<string, unknown>; // Custom metadata
 }
+```
 
-// Access control
+#### AccessControl
+
+```typescript
 interface AccessControl {
-  user: string;
+  user: string;                  // User email address
   access_level: 'read' | 'read_write' | 'comment';
 }
 ```
 
----
+#### SearchDocumentsResult
 
-#### `src/types/provider.types.ts`
-**Purpose:** Provider-specific configuration types
-
-**Key Types:**
 ```typescript
-// Google Drive configuration
-
-interface GoogleDriveConfig {
-  serviceAccountKey: ServiceAccountKey;
-  adminEmail: string;
-}
-
-// S3 configuration (future)
-interface S3Config {
-  region: string;
-  bucket: string;
-  accessKeyId?: string;
-  secretAccessKey?: string;
+interface SearchDocumentsResult {
+  documents: Document[];
+  nextPageToken?: string | null;
+  limit: number;
 }
 ```
 
----
+## ⚠️ Error Handling
 
-### Provider Layer
+The service uses a hierarchical error system for comprehensive error handling:
 
-#### `providers/IStorageProvider.ts`
-**Purpose:** Interface that all storage providers must implement
+### Error Types
 
-**Contract Methods:**
+```typescript
+// Base error class
+class DocumentStorageError extends Error
+
+// Provider-specific errors (API failures, network issues)
+class ProviderError extends DocumentStorageError
+
+// Input validation errors
+class ValidationError extends DocumentStorageError
+
+// Resource not found errors
+class NotFoundError extends DocumentStorageError
+
+// Permission/authorization errors
+class PermissionError extends DocumentStorageError
+
+// Feature not implemented by provider
+class NotImplementedError extends DocumentStorageError
+```
+
+### Error Handling Example
+
+```typescript
+try {
+  const document = await documentManager.createDocument({
+    source_reference: 'invalid-id',
+    source_owner: 'teacher@yourdomain.com'
+  });
+} catch (error) {
+  if (error instanceof NotFoundError) {
+    console.error('Document not found:', error.message);
+  } else if (error instanceof ProviderError) {
+    console.error('Google Drive API error:', error.message);
+    console.error('Original error:', error.originalError);
+  } else if (error instanceof ValidationError) {
+    console.error('Invalid input:', error.message);
+  } else {
+    console.error('Unexpected error:', error);
+  }
+}
+```
+
+### Common Error Scenarios
+
+#### Google Drive Errors
+- **404 Errors**: Document not found or user doesn't have access
+- **403 Errors**: Insufficient permissions or domain-wide delegation not configured
+- **400 Errors**: Invalid request parameters or malformed service account key
+- **Rate Limiting**: Google API quota exceeded (handled automatically with retries)
+
+#### Amazon S3 Errors (Future)
+- **403 Errors**: Insufficient S3 permissions or bucket access denied
+- **404 Errors**: Object not found in S3 bucket
+- **400 Errors**: Invalid bucket name or region configuration
+- **Rate Limiting**: AWS API throttling (handled automatically with retries)
+
+## 💡 Best Practices
+
+### When to Use Which Operations
+
+- **`createDocument`**: Use for copying documents from users with full workflow (ownership transfer, permissions, metadata)
+- **`getDocument`**: Use for retrieving document information
+- **`updateDocument`**: Use for modifying document names or adding metadata
+- **`setAccessControl`**: Use for changing permissions on existing documents
+- **`listDocuments`**: Use for searching and filtering documents by metadata
+
+### Pagination Guidance
+
+- Use `limit` parameter to control page size (max 100)
+- Always check for `nextPageToken` to handle pagination
+- For large datasets, implement proper pagination loops
+- Consider caching results for frequently accessed data
+
+### Security Considerations
+
+#### Google Drive
+- **Service Account Key**: Store securely, never commit to version control
+- **Domain-wide Delegation**: Only grant necessary scopes
+- **Admin Email**: Use a dedicated service account, not personal admin account
+- **Permissions**: Follow principle of least privilege
+- **Audit Logging**: Monitor document operations for compliance
+
+#### Amazon S3 (Future)
+- **Access Keys**: Store AWS credentials securely, use IAM roles when possible
+- **Bucket Policies**: Implement least-privilege bucket access policies
+- **Encryption**: Enable S3 server-side encryption for sensitive documents
+- **CORS**: Configure CORS policies appropriately for web access
+- **Audit Logging**: Enable CloudTrail for S3 operations monitoring
+
+### Performance Tips
+
+#### Google Drive
+- **Client Caching**: The service caches Drive API clients per user
+- **Batch Operations**: Consider batching multiple operations
+- **Metadata Search**: Use specific filters to reduce search scope
+- **Folder Structure**: Plan folder hierarchy to avoid deep nesting
+
+#### Amazon S3 (Future)
+- **Multipart Uploads**: Use multipart uploads for large files
+- **CloudFront**: Use CloudFront CDN for faster document access
+- **Object Lifecycle**: Configure lifecycle policies for cost optimization
+- **Parallel Operations**: Leverage S3's parallel processing capabilities
+
+## 🔧 Development
+
+### Project Structure
+
+```
+src/
+├── DocumentManager.ts          # Main facade class
+├── index.ts                   # Public API exports
+└── types/                     # Type definitions
+    ├── common.types.ts        # Core types
+    ├── provider.types.ts      # Provider configurations
+    └── errors.types.ts        # Error classes
+
+providers/
+├── IStorageProvider.ts        # Provider interface
+├── google-drive/              # Google Drive implementation
+│   ├── GoogleDriveProvider.ts # Main orchestrator
+│   ├── auth.ts               # Authentication helper
+│   ├── operations.ts         # Document operations
+│   ├── permissions.ts        # Permission management
+│   └── metadata.ts           # Metadata operations
+└── s3/                        # Amazon S3 implementation (future)
+    ├── S3Provider.ts          # Main orchestrator
+    ├── auth.ts               # AWS authentication
+    ├── operations.ts         # S3 operations
+    ├── permissions.ts        # IAM permissions
+    └── metadata.ts           # S3 metadata/tags
+```
+
+### Extending with New Operations
+
+To add new operations:
+
+1. **Add method to interface** (`IStorageProvider.ts`):
 ```typescript
 interface IStorageProvider {
-  // Document operations
-  copyDocument(request: CreateDocumentRequest): Promise<Document>;
-  getDocument(documentId: string): Promise<Document>;
-  deleteDocument(documentId: string): Promise<void>;
-  updateDocument(documentId: string, updates: {name?: string, metadata?: any}): Promise<Document>;
-  
-  // Metadata operations
-  setMetadata(documentId: string, metadata: Record<string, any>): Promise<void>;
-  getMetadata(documentId: string): Promise<Record<string, any>>;
-  searchByMetadata(filters: Record<string, any>, limit?: number, offset?: number): Promise<SearchDocumentsResult>;
-  
-  // Access control
-  setPermissions(documentId: string, accessControl: AccessControl[]): Promise<void>;
-  getPermissions(documentId: string): Promise<AccessControl[]>;
-  
-  // Folder management
-  createFolderPath(path: string): Promise<string>;  // No ownerEmail parameter
-  
-  // Optional
-  getRevisions?(documentId: string): Promise<Revision[]>;
-  getComments?(documentId: string): Promise<Comment[]>;
+  // ... existing methods
+  newOperation?(param: string): Promise<Result>;
 }
 ```
 
-**Why this exists:** Allows adding new storage providers (S3, Azure, etc.) without changing the main API
-
----
-
-#### `providers/google-drive/GoogleDriveProvider.ts`
-**Purpose:** Google Drive implementation of IStorageProvider
-
-**Responsibilities:**
-- Initialize Google Drive API client
-- Implement all IStorageProvider methods
-- Orchestrate helper modules (auth, folders, permissions, metadata)
-- Handle Google Drive specific operations
-
-**Key Operations:**
-- `copyDocument()` - Copies file in Google Drive, sets up ownership
-- `setMetadata()` - Uses Google Drive custom file properties API
-- `searchByMetadata()` - Queries Google Drive using properties
-- `getRevisions()` - Uses Google Drive revisions API
-- `getComments()` - Uses Google Drive comments API
-
----
-
-#### `providers/google-drive/auth.ts`
-**Purpose:** Handle Google Drive authentication
-
-**What it does:**
-- Creates JWT client from service account credentials
-- Sets up OAuth scopes
-- Handles domain-wide delegation if needed
-- Provides authenticated client for API calls
-
-**Key Class:**
+2. **Implement in GoogleDriveProvider**:
 ```typescript
-class GoogleAuth {
-  private jwtClient: JWT;
-  
-  constructor(config: GoogleDriveConfig) {
-    // Load service account credentials
-    // Create JWT client
-    // Set OAuth scopes
-  }
-  
-  getClient(): JWT {
-    return this.jwtClient;
-  }
+async newOperation(param: string): Promise<Result> {
+  // Implementation using existing components
+  return await this.operations.newOperation(param);
 }
 ```
 
----
-
-
-
-#### providers/google-drive/operations.ts
-**Purpose:** Handle core document operations
-
-**What it does:**
-- Copy documents with two-step ownership transfer
-- Get document metadata
-- Update document names
-- Delete documents permanently
-
-**Key Methods:**
-- `copyWithOwnershipTransfer()` - Impersonate source owner, copy, then transfer to admin
-- `getDocument()` - Retrieve file metadata
-- `updateName()` - Update file name
-- `deleteDocument()` - Permanently delete file
-
-#### `providers/google-drive/folders.ts`
-**Purpose:** Manage folder hierarchy in Google Drive
-
-**What it does:**
-- Parses folder paths (e.g., "course/unit1/masters")
-- Creates nested folder structure
-- Finds existing folders or creates new ones
-- Returns folder ID for document placement
-
-**Key Class:**
+3. **Add to DocumentManager**:
 ```typescript
-class FolderManager {
-  async createPath(path: string): Promise<string> {
-    // Split "course/unit1/masters" into parts
-    // For each part, find or create folder
-    // Return final folder ID
-  }
-  
-  private async findOrCreateFolder(name: string, parentId: string | null): Promise<string> {
-    // Search for existing folder
-    // If not found, create new folder
-    // Return folder ID
-  }
+async newOperation(param: string): Promise<Result> {
+  return await this.provider.newOperation(param);
 }
 ```
 
-**Example:** 
-- Input: `"us_history2/unit1/masters"`
-- Creates: `us_history2/` → `us_history2/unit1/` → `us_history2/unit1/masters/`
-- Returns: Folder ID of `masters/`
+4. **Update types** if needed in `types/` directory
 
----
+### Building and Testing
 
-#### `providers/google-drive/permissions.ts`
-**Purpose:** Map generic access levels to Google Drive permissions
-
-**What it does:**
-- Converts access levels (read, read_write, comment) to Google Drive roles
-- Sets permissions on files
-- Transfers ownership when needed
-- Clears old permissions before setting new ones
-
-**Key Class:**
-```typescript
-class PermissionManager {
-  async setPermissions(fileId: string, accessControl: AccessControl[]): Promise<void> {
-    // Remove existing permissions (except owner)
-    // Map access_level to Google Drive role
-    // Create new permissions
-  }
-  
-  async transferOwnership(fileId: string, ownerEmail: string): Promise<void> {
-    // Transfer file ownership to specified user
-  }
-  
-  private mapAccessLevelToRole(level: string): string {
-    // read → reader
-    // read_write → writer
-    // comment → commenter
-  }
-}
-```
-
-**Mapping:**
-- `read` → Google Drive `reader` role
-- `read_write` → Google Drive `writer` role
-- `comment` → Google Drive `commenter` role
-
----
-
-#### `providers/google-drive/metadata.ts`
-**Purpose:** Store and query metadata using Google Drive custom properties (NO DATABASE)
-
-**What it does:**
-- Stores metadata as Google Drive file properties
-- Retrieves metadata from file properties
-- Searches documents by metadata using Google Drive query API
-- Enables filtering by activity_id, student_id, etc.
-
-**Key Class:**
-```typescript
-class MetadataManager {
-  async setMetadata(fileId: string, metadata: Record<string, any>): Promise<void> {
-    // Store metadata in Google Drive custom properties
-  }
-  
-  async getMetadata(fileId: string): Promise<Record<string, any>> {
-    // Retrieve custom properties from file
-  }
-  
-  async searchByMetadata(filters: Record<string, any>): Promise<Document[]> {
-    // Build query: properties has { key='activity_id' and value='act_123' }
-    // Search Google Drive
-    // Return matching documents
-  }
-}
-```
-
-**Important:** No separate database! All metadata stored directly in Google Drive.
-
----
-
-### Utilities
-
-#### `utils/errors.ts`
-**Purpose:** Custom error classes for better error handling
-
-**Error Types:**
-```typescript
-class DocumentStorageError extends Error       // Base error
-class ProviderError extends DocumentStorageError // Provider-specific errors
-class ValidationError extends DocumentStorageError // Input validation errors
-class NotFoundError extends DocumentStorageError  // Resource not found
-class NotImplementedError extends DocumentStorageError // Feature not supported by provider
-```
-
-**Usage in code:**
-```typescript
-if (!request.source_reference) {
-  throw new ValidationError('source_reference is required');
-}
-```
-
----
-
-#### `utils/validators.ts`
-**Purpose:** Validate inputs before sending to providers
-
-**What it validates:**
-- Required fields are present
-- Field types are correct
-- Access levels are valid (read, read_write, comment)
-- Email formats are valid
-- Metadata structure is correct
-
-**Example:**
-```typescript
-function validateCreateRequest(request: CreateDocumentRequest): void {
-  if (!request.provider) throw new ValidationError('provider required');
-  if (!request.source_reference) throw new ValidationError('source_reference required');
-  // ... more validations
-}
-```
-
----
-
-#### `utils/logger.ts`
-**Purpose:** Simple logging utility (optional)
-
-**What it provides:**
-- Structured logging interface
-- Log levels (debug, info, warn, error)
-- Can be replaced with external logger
-
----
-
-## 🔄 Complete Workflow
-
-### Scenario: Teacher creates master copy and student works on it
-
-#### Step 1: Initialize Library
-```typescript
-import { DocumentManager, GoogleDriveProvider } from 'document-storage-lib';
-
-// Create Google Drive provider
-const googleDrive = new GoogleDriveProvider({
-  serviceAccountKey: './service-account.json',
-  lmsSystemAccount: 'lms@school.edu'
-});
-
-// Create document manager
-const docManager = new DocumentManager(googleDrive);
-```
-
-**What happens:**
-1. `GoogleDriveProvider` constructor creates `GoogleAuth` instance
-2. Authenticates with Google using service account
-3. Initializes Drive API client
-4. Creates helper instances (FolderManager, PermissionManager, MetadataManager)
-
----
-
-#### Step 2: Teacher Creates Master Copy
-```typescript
-const masterDoc = await docManager.createDocument({
-  provider: 'google_drive',
-  source_reference: '1a2b3c4d5e6f',
-  source_owner: 'teacher@school.edu',
-  name: 'Essay Assignment - Master',
-  folder_path: 'us_history2/unit1/masters',
-  metadata: {
-    activity_id: 'act_123',
-    document_type: 'master',
-    course_id: 'us_history2'
-  }
-});
-```
-
-**Internal Flow:**
-
-1. **DocumentManager.createDocument()**
-   - Validates input using `validators.ts`
-   - Calls `googleDrive.copyDocument()`
-
-2. **GoogleDriveProvider.copyDocument()**
-   - Calls `folderManager.createPath('us_history2/unit1/masters')`
-   
-3. **FolderManager.createPath()**
-   - Splits path into ['us_history2', 'unit1', 'masters']
-   - Creates each folder if doesn't exist
-   - Returns final folder ID
-
-4. **Back to GoogleDriveProvider**
-   - Calls Google Drive API to copy file
-   - Places copy in folder from step 3
-   - Calls `operations.copyWithOwnershipTransfer()`
-   - Calls `metadataManager.setMetadata()` to store metadata
-   - Returns Document object
-
-5. **DocumentManager returns result to caller**
-
-**Result:** 
-- New document created in Google Drive
-- Owned by teacher@school.edu
-- Stored in correct folder
-- Metadata saved in Google Drive custom properties
-
----
-
-#### Step 3: Student Creates Working Copy
-```typescript
-const studentDoc = await docManager.createDocument({
-  provider: 'google_drive',
-  source_reference: masterDoc.document_id,  // Copy from master
-  source_owner: 'admin@school.edu'
-  folder_path: 'us_history2/unit1/student_copies',
-  access_control: [
-    { user: 'student@school.edu', access_level: 'read_write' },
-    { user: 'teacher@school.edu', access_level: 'read' }
-  ],
-  metadata: {
-    activity_id: 'act_123',
-    document_type: 'student_copy',
-    student_id: 'student@school.edu',
-    master_copy_id: masterDoc.document_id
-  }
-});
-```
-
-**Internal Flow:**
-
-1. **DocumentManager validates and delegates**
-
-2. **GoogleDriveProvider.copyDocument()**
-   - Creates folder path for student copies
-   - Copies master document
-   - Stores metadata
-
-3. **DocumentManager.createDocument() continues**
-   - Sees `access_control` in request
-   - Calls `googleDrive.setPermissions()`
-
-4. **PermissionManager.setPermissions()**
-   - Clears existing permissions
-   - Maps `read_write` → `writer` role
-   - Maps `read` → `reader` role
-   - Grants permissions to student and teacher
-
-**Result:**
-- Student gets their own copy
-- Student can edit (writer permission)
-- Teacher can view (reader permission)
-- Metadata links it to master and activity
-
----
-
-#### Step 4: Student Submits Work
-```typescript
-await docManager.setAccessControl(studentDoc.storage_reference, [
-  { user: 'student@school.edu', access_level: 'read' },
-  { user: 'teacher@school.edu', access_level: 'comment' }
-]);
-```
-
-**Internal Flow:**
-
-1. **DocumentManager.setAccessControl()**
-   - Validates access control array
-   - Calls `googleDrive.setPermissions()`
-
-2. **PermissionManager.setPermissions()**
-   - Removes old permissions
-   - Sets student to `reader` (read-only)
-   - Sets teacher to `commenter` (can comment)
-
-**Result:**
-- Student can only view their work (no more editing)
-- Teacher can view and add comments
-
----
-
-#### Step 5: Teacher Requests Revision
-```typescript
-await docManager.setAccessControl(studentDoc.storage_reference, [
-  { user: 'student@school.edu', access_level: 'read_write' },
-  { user: 'teacher@school.edu', access_level: 'comment' }
-]);
-```
-
-**Result:**
-- Student can edit again (same document, no new copy)
-- Teacher maintains comment access
-- Google Drive automatically tracks version history
-
----
-
-#### Step 6: LMS Queries Student Copies
-```typescript
-const studentCopies = await docManager.listDocuments({
-  filters: {
-    activity_id: 'act_123',
-    document_type: 'student_copy'
-  },
-  limit: 50
-});
-```
-
-**Internal Flow:**
-
-1. **DocumentManager.listDocuments()**
-   - Calls `googleDrive.searchByMetadata()`
-
-2. **MetadataManager.searchByMetadata()**
-   - Builds Google Drive query:
-     ```
-     properties has { key='activity_id' and value='act_123' } and
-     properties has { key='document_type' and value='student_copy' }
-     ```
-   - Executes search
-   - Returns matching documents with metadata
-
-**Result:** List of all student copies for this activity
-
----
-
-## 🎯 Key Design Concepts
-
-### 1. No Database Architecture
-**All data is stored in the provider:**
-- **Google Drive:** Uses custom file properties API
-- **S3 (future):** Uses object tags
-
-**Ownership Model:**
-- All documents are owned by the admin account (specified in config)
-- Service account uses domain-wide delegation to impersonate users
-- Only `copyDocument` needs `source_owner` to access source documents
-- All other operations performed as admin
-
-**Benefits:**
-- Simpler deployment (no DB to manage)
-- Single source of truth
-- Centralized control
-- Provider-native features (search, versioning)
-
-### 2. Provider Pattern
-**Easy to add new storage types:**
-```typescript
-// Add S3 support
-class S3Provider implements IStorageProvider {
-  // Implement all required methods
-}
-
-// Use it
-const s3 = new S3Provider(config);
-const manager = new DocumentManager(s3);
-```
-
-### 3. Separation of Concerns
-- **DocumentManager:** Validation, orchestration
-- **Provider:** Storage operations
-- **Helper modules:** Specialized tasks (auth, folders, permissions)
-
-### 4. Type Safety
-- Full TypeScript support
-- Compile-time error checking
-- IntelliSense support in IDEs
-
----
-
-## 📦 Installation & Usage
-
-### Install
 ```bash
-npm install document-storage-lib
+# Install dependencies
+pnpm install
+
+# Build the project
+pnpm run build
+
+# Run tests
+pnpm test
+
+# Run tests with coverage
+pnpm run test:coverage
+
+# Type checking
+pnpm run type-check
+
+# Development mode with watch
+pnpm run dev
 ```
 
-### Basic Usage
-```typescript
-import { DocumentManager, GoogleDriveProvider } from 'document-storage-lib';
+### Contributing
 
-// Setup
-import serviceAccountKey from './service-account-key.json';
-
-const provider = new GoogleDriveProvider({
-  serviceAccountKey: serviceAccountKey,  // Object, not string
-  adminEmail: 'admin@school.edu'  // Changed from lmsSystemAccount
-});
-
-const manager = new DocumentManager(provider);
-
-// Create document
-const doc = await manager.createDocument({
-  provider: 'google_drive',
-  source_reference: 'abc123',
-  source_owner: 'teacher@school.edu',  // ✅ Required field
-  name: 'My Document',
-  metadata: { activity_id: 'act_1' }
-});
-
-const manager = new DocumentManager(provider);
-
-// Create document
-const doc = await manager.createDocument({
-  provider: 'google_drive',
-  source_reference: 'abc123',
-  name: 'My Document',
-  metadata: { activity_id: 'act_1' }
-});
-
-// Update permissions
-await manager.setAccessControl(doc.storage_reference, [
-  { user: 'user@school.edu', access_level: 'read_write' }
-]);
-```
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Ensure all tests pass
+6. Submit a pull request
 
 ---
 
-## 🔌 Adding New Providers
+## 📄 License
 
-To add a new storage provider (e.g., S3):
+ISC License - see LICENSE file for details.
 
-1. Create `providers/s3/S3Provider.ts`
-2. Implement `IStorageProvider` interface
-3. Handle provider-specific logic
-4. Export from `providers/index.ts`
+## 👥 Author
 
-```typescript
-class S3Provider implements IStorageProvider {
-  async copyDocument(request: CreateDocumentRequest): Promise<Document> {
-    // Copy object in S3
-    // Store metadata as object tags
-    // Generate pre-signed URL
-  }
-  
-  // ... implement other methods
-}
-```
+**Nimit Jain** - *Initial work*
 
-The `DocumentManager` will work with it automatically!
+---
+
+*This service is designed for educational platforms and enterprise environments requiring sophisticated document management capabilities across multiple cloud storage providers.*
