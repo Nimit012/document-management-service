@@ -1,4 +1,11 @@
-import { Document, CreateDocumentRequest, AccessControl } from '../src/types';
+import {
+  Document,
+  CreateDocumentRequest,
+  AccessControl,
+  SearchDocumentsResult,
+  Comment,
+  Revision
+} from '../src/types';
 
 /**
  * Interface for all storage providers (Google Drive, S3, Azure, etc.).
@@ -71,4 +78,45 @@ export interface IStorageProvider {
    * @param accessControl - Array of access control rules
    */
   setPermissions(documentId: string, accessControl: AccessControl[]): Promise<void>;
+
+  /**
+   * Search documents by metadata filters
+   * Always performed as admin (who owns all documents)
+   *
+   * Example: { activity_id: 'act_123', document_type: 'student_copy' }
+   *
+   * @param filters - Metadata key-value filters
+   * @param limit - Maximum results to return (default: 20)
+   * @param offset - Pagination offset (default: 0)
+   * @returns Search results with documents
+   */
+  searchByMetadata(
+    filters: Record<string, unknown>,
+    limit?: number,
+    pageToken?: string
+  ): Promise<SearchDocumentsResult>;
+
+  /**
+   * Get comments on document (optional - provider-specific)
+   * Always performed as admin (who owns all documents)
+   *
+   * Google Drive: Fully supported
+   * S3: Not supported (returns empty array or throws NotImplementedError)
+   *
+   * @param documentId - Document identifier
+   * @returns Array of comments
+   */
+  getComments?(documentId: string): Promise<Comment[]>;
+
+  /**
+   * Get revision history for document (optional - provider-specific)
+   * Always performed as admin (who owns all documents)
+   *
+   * Google Drive: Fully supported
+   * S3: Not supported (returns empty array or throws NotImplementedError)
+   *
+   * @param documentId - Document identifier
+   * @returns Array of revisions
+   */
+  getRevisions?(documentId: string): Promise<Revision[]>;
 }

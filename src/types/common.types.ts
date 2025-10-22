@@ -2,18 +2,17 @@
  * Core document type returned by all operations
  */
 export interface Document {
-    document_id: string;
-    storage_reference: string;
-    name: string;
-    access_url: string;
-    folder_path?: string;
-    created_at: string;
-    updated_at?: string;
-    metadata?: Record<string, unknown>;
-  }
-  
+  document_id: string;
+  storage_reference: string;
+  name: string;
+  access_url: string;
+  folder_path?: string;
+  created_at: string;
+  updated_at?: string;
+  metadata?: Record<string, unknown>;
+}
 
-  /**
+/**
  * Request to create a new document by copying from source
  */
 export interface CreateDocumentRequest {
@@ -24,59 +23,58 @@ export interface CreateDocumentRequest {
   access_control?: AccessControl[];
   metadata?: Record<string, unknown>;
 }
-  
-  /**
-   * Access control rule for document permissions
-   */
-  export interface AccessControl {
-    user: string; // Email address
-    access_level: 'read' | 'read_write' | 'comment';
-  }
-  
-  /**
-   * Document revision (Google Drive specific)
-   */
-  export interface Revision {
-    revision_id: string;
-    modified_time: string;
-    modified_by: string;
-    export_links?: Record<string, string>;
-  }
-  
-  /**
-   * Document comment (Google Drive specific)
-   */
-  export interface Comment {
-    comment_id: string;
-    author: string;
-    content: string;
-    created_at: string;
-    resolved: boolean;
-    replies?: CommentReply[];
-  }
-  
-  export interface CommentReply {
-    reply_id: string;
-    author: string;
-    content: string;
-    created_at: string;
-  }
-  
-  /**
-   * Search/list parameters
-   */
-  export interface SearchDocumentsParams {
-    filters?: Record<string, unknown>;
-    limit?: number;
-    offset?: number;
-  }
-  
-  /**
-   * Search results with pagination
-   */
-  export interface SearchDocumentsResult {
-    documents: Document[];
-    total: number;
-    limit: number;
-    offset: number;
-  }
+
+/**
+ * Access control rule for document permissions
+ */
+export interface AccessControl {
+  user: string; // Email address
+  access_level: 'read' | 'read_write' | 'comment';
+}
+
+/**
+ * Document revision (Google Drive specific)
+ */
+export interface Revision {
+  revision_id: string;
+  modified_time: string;
+  modified_by: string;
+  export_links?: Record<string, string>;
+}
+
+/**
+ * Document comment (Google Drive specific)
+ */
+export interface Comment {
+  comment_id: string;
+  author: string;
+  content: string;
+  created_at: string;
+  resolved: boolean;
+  replies?: CommentReply[];
+}
+
+export interface CommentReply {
+  reply_id: string;
+  author: string;
+  content: string;
+  created_at: string;
+}
+
+/**
+ * Search/list parameters
+ */
+export interface SearchDocumentsParams {
+  filters?: Record<string, unknown>;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * Search results with pagination
+ */
+export interface SearchDocumentsResult {
+  documents: Document[];
+  nextPageToken?: string | null ; // Token for next page (undefined if no more results)
+  limit: number;
+}
