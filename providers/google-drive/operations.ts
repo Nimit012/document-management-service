@@ -106,7 +106,6 @@ export class DocumentOperations {
         }
       });
 
-      console.log(`✅ Document name updated: ${newName}`);
     } catch (error: unknown) {
       if (error && typeof error === 'object' && 'code' in error && error.code === 404) {
         throw new NotFoundError('Document', documentId);
@@ -133,7 +132,6 @@ export class DocumentOperations {
         fileId: documentId
       });
 
-      console.log(`🗑️ Document deleted: ${documentId}`);
     } catch (error: unknown) {
       if (error && typeof error === 'object' && 'code' in error && error.code === 404) {
         throw new NotFoundError('Document', documentId);
@@ -177,14 +175,11 @@ export class DocumentOperations {
 
       // Create each folder in the path
       for (const folderName of segments) {
-        console.log(`📁 Processing folder: ${folderName} (parent: ${parentId || 'root'})`);
 
         parentId = await this._findOrCreateFolder(adminDriveClient, folderName, parentId);
 
-        console.log(`✅ Folder ready: ${folderName} (id: ${parentId})`);
       }
 
-      console.log(`✅ Complete folder path created: ${path}`);
       return parentId!;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -209,12 +204,10 @@ export class DocumentOperations {
     const existingFolder = await this._findFolder(drive, folderName, parentId);
 
     if (existingFolder) {
-      console.log(`  ℹ️ Folder already exists: ${folderName}`);
       return existingFolder;
     }
 
     // Step 2: Create new folder if not found
-    console.log(`  ➕ Creating new folder: ${folderName}`);
     return await this._createFolder(drive, folderName, parentId);
   }
 

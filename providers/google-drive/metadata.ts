@@ -57,7 +57,6 @@ export class DocumentMetadata {
         fields: 'properties'
       });
 
-      console.log(`✅ Metadata set on ${documentId}:`, Object.keys(properties));
     } catch (error: unknown) {
       if (error && typeof error === 'object' && 'code' in error && error.code === 404) {
         throw new NotFoundError('Document', documentId);
@@ -175,11 +174,6 @@ export class DocumentMetadata {
       // Combine all query parts
       const query = queryParts.join(' and ');
 
-      console.log(`🔍 Searching with query: ${query}`);
-      if (pageToken) {
-        console.log(`📄 Using page token for pagination`);
-      }
-
       // Execute search with pagination
       const response = await adminDrive.files.list({
         q: query,
@@ -195,10 +189,6 @@ export class DocumentMetadata {
 
       // Transform to Document format
       const documents: Document[] = files.map((file) => this._toDocumentObject(file));
-
-      console.log(
-        `✅ Found ${documents.length} documents${nextPageToken ? ' (more available)' : ' (last page)'}`
-      );
 
       return {
         documents,

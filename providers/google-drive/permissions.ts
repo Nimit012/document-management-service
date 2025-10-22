@@ -84,7 +84,6 @@ export class DocumentPermissions {
       const adminDriveClient = await this.authHelper.createAdminDriveClient();
 
       // Step 1: Get existing permissions
-      console.log(`📋 Getting existing permissions for ${documentId}...`);
       const existingPermissions = await adminDriveClient.permissions.list({
         fileId: documentId,
         fields: 'permissions(id,role,emailAddress,type)'
@@ -93,11 +92,9 @@ export class DocumentPermissions {
       const permissions = existingPermissions.data.permissions || [];
 
       // Step 2: Delete all non-owner permissions
-      console.log(`🗑️ Removing ${permissions.length} existing permissions...`);
       for (const permission of permissions) {
         // Never delete owner permission
         if (permission.role === 'owner') {
-          console.log(`⏭️ Skipping owner permission: ${permission.emailAddress}`);
           continue;
         }
 
@@ -107,15 +104,13 @@ export class DocumentPermissions {
               fileId: documentId,
               permissionId: permission.id
             });
-            console.log(`✅ Removed permission: ${permission.emailAddress} (${permission.role})`);
           } catch (error) {
-            console.warn(`⚠️ Failed to remove permission ${permission.id}:`, error);
+            console.warn(`Failed to remove permission ${permission.id}:`, error);
           }
         }
       }
 
       // Step 3: Create new permissions
-      console.log(`➕ Adding ${accessControl.length} new permissions...`);
       for (const ac of accessControl) {
         const role = this._mapAccessLevelToRole(ac.access_level);
 
@@ -129,10 +124,8 @@ export class DocumentPermissions {
           sendNotificationEmail: false // Don't spam users with emails
         });
 
-        console.log(`✅ Granted ${ac.access_level} access to ${ac.user}`);
       }
 
-      console.log(`✅ Permissions updated successfully`);
     } catch (error: unknown) {
       if (error && typeof error === 'object' && 'code' in error && error.code === 404) {
         throw new NotFoundError('Document', documentId);
