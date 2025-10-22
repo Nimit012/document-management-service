@@ -201,4 +201,3 @@ export class DocumentMetadata {
         };
     }
 }
-//# sourceMappingURL=metadata.js.map

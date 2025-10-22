@@ -14,7 +14,6 @@
     "resolveJsonModule": true,
     "moduleResolution": "node",
     "types": ["node"],
-    "sourceMap": true
   },
   "include": ["src/**/*", "providers/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts", "tests/**/*"]

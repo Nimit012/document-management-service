@@ -2,4 +2,3 @@
 export { DocumentManager } from './DocumentManager';
 // All types
 export * from './types';
-//# sourceMappingURL=index.js.map

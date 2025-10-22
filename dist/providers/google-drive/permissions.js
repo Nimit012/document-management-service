@@ -179,4 +179,3 @@ export class DocumentPermissions {
         return mapping[role] || 'read'; // Default to read if unknown
     }
 }
-//# sourceMappingURL=permissions.js.map

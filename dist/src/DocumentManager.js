@@ -108,4 +108,3 @@ export class DocumentManager {
         return await this.provider.getRevisions(documentId);
     }
 }
-//# sourceMappingURL=DocumentManager.js.map

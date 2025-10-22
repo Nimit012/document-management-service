@@ -112,4 +112,3 @@ export class GoogleAuthHelper {
         return this.createDriveClient(this.adminEmail);
     }
 }
-//# sourceMappingURL=auth.js.map

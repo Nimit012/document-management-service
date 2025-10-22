@@ -59,4 +59,3 @@ export class NotImplementedError extends DocumentStorageError {
         Object.setPrototypeOf(this, NotImplementedError.prototype);
     }
 }
-//# sourceMappingURL=errors.types.js.map
