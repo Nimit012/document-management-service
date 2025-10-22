@@ -2,7 +2,9 @@ import {
   Document,
   CreateDocumentRequest,
   AccessControl,
-  SearchDocumentsResult
+  SearchDocumentsResult,
+  Comment,
+  Revision
 } from '../src/types';
 
 /**
@@ -93,4 +95,28 @@ export interface IStorageProvider {
     limit?: number,
     pageToken?: string
   ): Promise<SearchDocumentsResult>;
+
+  /**
+   * Get comments on document (optional - provider-specific)
+   * Always performed as admin (who owns all documents)
+   *
+   * Google Drive: Fully supported
+   * S3: Not supported (returns empty array or throws NotImplementedError)
+   *
+   * @param documentId - Document identifier
+   * @returns Array of comments
+   */
+  getComments?(documentId: string): Promise<Comment[]>;
+
+  /**
+   * Get revision history for document (optional - provider-specific)
+   * Always performed as admin (who owns all documents)
+   *
+   * Google Drive: Fully supported
+   * S3: Not supported (returns empty array or throws NotImplementedError)
+   *
+   * @param documentId - Document identifier
+   * @returns Array of revisions
+   */
+  getRevisions?(documentId: string): Promise<Revision[]>;
 }
