@@ -6,7 +6,9 @@ import {
   GoogleDriveConfig,
   ProviderError,
   AccessControl,
-  SearchDocumentsResult
+  SearchDocumentsResult,
+  Comment,
+  Revision
 } from '../../src/types';
 import { GoogleAuthHelper } from './auth';
 import { DocumentOperations } from './operations';
@@ -190,6 +192,31 @@ export class GoogleDriveProvider implements IStorageProvider {
   ): Promise<SearchDocumentsResult> {
     return await this.metadata.searchByMetadata(filters, limit, pageToken);
   }
+
+
+
+  /**
+   * Retrieves comments for a specific document from Google Drive.
+   * Always performed as admin (who owns all documents).
+   *
+   * @param documentId - The unique identifier of the document.
+   * @returns A promise resolving to an array of Comment objects.
+   */
+  async getComments(documentId: string): Promise<Comment[]> {
+    return await this.operations.getComments(documentId);
+  }
+
+  /**
+   * Retrieves revision history for a specific document from Google Drive.
+   * Always performed as admin (who owns all documents).
+   *
+   * @param documentId - The unique identifier of the document.
+   * @returns A promise resolving to an array of Revision objects.
+   */
+  async getRevisions(documentId: string): Promise<Revision[]> {
+    return await this.operations.getRevisions(documentId);
+  }
+  
 
   // ==================== HELPER METHODS ====================
 

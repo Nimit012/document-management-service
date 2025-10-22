@@ -145,6 +145,94 @@ async function testListDocuments() {
   }
 }
 
+async function testGetComments() {
+  // Initialize DocumentManager
+  const docManager = new DocumentManager({
+    provider: ProviderType.GOOGLE_DRIVE,
+    config: config
+  });
+
+  try {
+    console.log('Testing getComments function...');
+
+    // Use an existing document ID that might have comments
+    const documentId = '17rgRPjXlZ7Juj9GTezjI0iUsFsET00eL5i0eVyCMpqg'; // Replace with a valid file ID
+
+    console.log(`Getting comments for document: ${documentId}`);
+    const comments = await docManager.getComments(documentId);
+
+    console.log(`Found ${comments.length} comments:`);
+    
+    if (comments.length === 0) {
+      console.log('  No comments found on this document');
+    } else {
+      comments.forEach((comment, index) => {
+        console.log(`  ${index + 1}. Comment by ${comment.author}:`);
+        console.log(`     Content: ${comment.content}`);
+        console.log(`     Created: ${comment.created_at}`);
+        console.log(`     Resolved: ${comment.resolved}`);
+        
+        if (comment.replies && comment.replies.length > 0) {
+          console.log(`     Replies (${comment.replies.length}):`);
+          comment.replies.forEach((reply, replyIndex) => {
+            console.log(`       ${replyIndex + 1}. ${reply.author}: ${reply.content}`);
+            console.log(`          Created: ${reply.created_at}`);
+          });
+        }
+        console.log(''); // Empty line for readability
+      });
+    }
+
+    console.log('✅ getComments test completed successfully');
+  } catch (error) {
+    console.error('Error in getComments test:', error);
+  }
+}
+
+async function testGetRevisions() {
+  // Initialize DocumentManager
+  const docManager = new DocumentManager({
+    provider: ProviderType.GOOGLE_DRIVE,
+    config: config
+  });
+
+  try {
+    console.log('Testing getRevisions function...');
+
+    // Use an existing document ID that might have revisions
+    const documentId = '17rgRPjXlZ7Juj9GTezjI0iUsFsET00eL5i0eVyCMpqg'; // Replace with a valid file ID
+
+    console.log(`Getting revisions for document: ${documentId}`);
+    const revisions = await docManager.getRevisions(documentId);
+
+    console.log(`Found ${revisions.length} revisions:`);
+    
+    if (revisions.length === 0) {
+      console.log('  No revisions found for this document');
+    } else {
+      revisions.forEach((revision, index) => {
+        console.log(`  ${index + 1}. Revision ID: ${revision.revision_id}`);
+        console.log(`     Modified Time: ${revision.modified_time}`);
+        console.log(`     Modified By: ${revision.modified_by}`);
+        
+        if (revision.export_links && Object.keys(revision.export_links).length > 0) {
+          console.log(`     Export Links:`);
+          Object.entries(revision.export_links).forEach(([format, url]) => {
+            console.log(`       ${format}: ${url}`);
+          });
+        } else {
+          console.log(`     Export Links: None available`);
+        }
+        console.log(''); // Empty line for readability
+      });
+    }
+
+    console.log('✅ getRevisions test completed successfully');
+  } catch (error) {
+    console.error('Error in getRevisions test:', error);
+  }
+}
+
 async function testSetPermissions() {
   // Initialize DocumentManager
   const docManager = new DocumentManager({
@@ -185,9 +273,15 @@ async function runTests() {
   // await testDeleteDocument();
 
   console.log('\n5. Testing listDocuments...');
-  await testListDocuments();
+  // await testListDocuments();
 
-  console.log('\n6. Testing setPermissions...');
+  console.log('\n6. Testing getComments...');
+  // await testGetComments();
+
+  console.log('\n7. Testing getRevisions...');
+  await testGetRevisions();
+
+  console.log('\n8. Testing setPermissions...');
   // await testSetPermissions();
 
   console.log('\n=== All tests completed ===');

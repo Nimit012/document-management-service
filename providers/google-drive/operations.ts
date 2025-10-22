@@ -1,6 +1,6 @@
 import { drive_v3 } from 'googleapis';
 import { GoogleAuthHelper } from './auth';
-import { ProviderError, NotFoundError } from '../../src/types';
+import { ProviderError, NotFoundError, Comment, Revision } from '../../src/types';
 
 /**
  * Helper for Google Drive document operations.
@@ -84,10 +84,7 @@ export class DocumentOperations {
         throw new NotFoundError('Document', documentId);
       }
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new ProviderError(
-        `Failed to get document ${documentId}: ${errorMessage}`,
-        error
-      );
+      throw new ProviderError(`Failed to get document ${documentId}: ${errorMessage}`, error);
     }
   }
 
@@ -337,6 +334,89 @@ export class DocumentOperations {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new ProviderError(`Failed to move document to folder: ${errorMessage}`, error);
+    }
+  }
+
+  /**
+   * Retrieves comments for a document from Google Drive.
+   * Always performed as admin (who owns all documents).
+   *
+   * @param documentId - The unique identifier of the document.
+   * @returns A promise resolving to an array of Comment objects.
+   * @throws {NotFoundError} If the document is not found.
+   * @throws {ProviderError} If the operation fails.
+   */
+  async getComments(documentId: string): Promise<Comment[]> {
+    try {
+      const adminDriveClient = await this.authHelper.createAdminDriveClient();
+
+      const response = await adminDriveClient.comments.list({
+        fileId: documentId,
+        fields: 'comments(id,content,author,createdTime,resolved,replies)'
+      });
+
+      const comments = response.data.comments || [];
+
+      return comments.map((comment) => ({
+        comment_id: comment.id!,
+        author: comment.author?.displayName  || 'Unknown',
+        content: comment.content!,
+        created_at: comment.createdTime!,
+        resolved: comment.resolved || false,
+        replies: (comment.replies || []).map((reply) => ({
+          reply_id: reply.id!,
+          author: reply.author?.displayName  || 'Unknown',
+          content: reply.content!,
+          created_at: reply.createdTime!
+        }))
+      }));
+    } catch (error: unknown) {
+      if (error && typeof error === 'object' && 'code' in error && error.code === 404) {
+        throw new NotFoundError('Document', documentId);
+      }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new ProviderError(
+        `Failed to get comments for document ${documentId}: ${errorMessage}`,
+        error
+      );
+    }
+  }
+
+  /**
+   * Retrieves revisions for a document from Google Drive.
+   * Always performed as admin (who owns all documents).
+   *
+   * @param documentId - The unique identifier of the document.
+   * @returns A promise resolving to an array of Revision objects.
+   * @throws {NotFoundError} If the document is not found.
+   * @throws {ProviderError} If the operation fails.
+   */
+  async getRevisions(documentId: string): Promise<Revision[]> {
+    try {
+      const adminDriveClient = await this.authHelper.createAdminDriveClient();
+
+      const response = await adminDriveClient.revisions.list({
+        fileId: documentId,
+        fields: 'revisions(id,modifiedTime,lastModifyingUser,exportLinks)'
+      });
+
+      const revisions = response.data.revisions || [];
+
+      return revisions.map((rev) => ({
+        revision_id: rev.id!,
+        modified_time: rev.modifiedTime!,
+        modified_by: rev.lastModifyingUser?.emailAddress || 'Unknown',
+        export_links: rev.exportLinks || undefined
+      }));
+    } catch (error: unknown) {
+      if (error && typeof error === 'object' && 'code' in error && error.code === 404) {
+        throw new NotFoundError('Document', documentId);
+      }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new ProviderError(
+        `Failed to get revisions for document ${documentId}: ${errorMessage}`,
+        error
+      );
     }
   }
 }

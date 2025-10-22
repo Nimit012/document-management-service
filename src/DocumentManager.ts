@@ -6,7 +6,9 @@ import {
   ValidationError,
   ProviderType,
   AccessControl,
-  SearchDocumentsResult
+  SearchDocumentsResult,
+  Comment,
+  Revision
 } from './types';
 
 import { IStorageProvider } from '../providers/IStorageProvider';
@@ -129,5 +131,42 @@ export class DocumentManager {
     pageToken?: string
   ): Promise<SearchDocumentsResult> {
     return await this.provider.searchByMetadata(filters, limit, pageToken);
+  }
+
+
+
+  /**
+   * Retrieves comments for a given document, if supported by the provider.
+   *
+   * @param documentId - The unique identifier of the document to get comments for.
+   * @returns A promise that resolves to an array of Comment objects.
+   * @throws Error if comments are not supported by the underlying provider.
+   */
+  async getComments(documentId: string): Promise<Comment[]> {
+    // validateDocumentId(documentId);
+    
+    if (!this.provider.getComments) {
+      throw new Error('Comments not supported by this provider');
+    }
+    
+    return await this.provider.getComments(documentId);
+  }
+
+
+  /**
+   * Retrieves the revision history for a given document, if supported by the provider.
+   *
+   * @param documentId - The unique identifier of the document to get revisions for.
+   * @returns A promise that resolves to an array of Revision objects.
+   * @throws Error if revisions are not supported by the underlying provider.
+   */
+  async getRevisions(documentId: string): Promise<Revision[]> {
+    // validateDocumentId(documentId);
+    
+    if (!this.provider.getRevisions) {
+      throw new Error('Revisions not supported by this provider');
+    }
+    
+    return await this.provider.getRevisions(documentId);
   }
 }
