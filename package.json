@@ -2,19 +2,22 @@
   "name": "document-management-service",
   "version": "1.0.0",
   "description": "Document management library for educational platforms",
-  "main": "dist/src/index.js",
-  "module": "dist/src/index.js",
-  "type": "module",
-  "types": "dist/src/index.d.ts",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/src/index.d.ts",
-      "import": "./dist/src/index.js"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
     }
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "build": "tsc",
-    "build:watch": "tsc --watch",
+    "build": "tsdown",
+    "build:watch": "tsdown --watch",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
@@ -39,6 +42,7 @@
     "prettier": "^3.6.2",
     "ts-jest": "^29.4.5",
     "ts-node": "^10.9.2",
+    "tsdown": "^0.15.9",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.0"
   },
