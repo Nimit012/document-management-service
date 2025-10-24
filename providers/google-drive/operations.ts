@@ -26,7 +26,7 @@ export class DocumentOperations {
    * Copies a document from the source owner's account.
    *
    * @param sourceDocId Source document ID to copy from.
-   * @param sourceOwnerEmail Email of the user who owns/can access the source.
+   * @param sourceOwnerEmail Email of the user who owns/can access the source (optional, uses admin if not provided).
    * @param newName Name for the copied document (optional).
    * @returns Copied file metadata as a Drive file object.
    * @throws {NotFoundError} If the source document is not found.
@@ -34,11 +34,14 @@ export class DocumentOperations {
    */
   async copyDocument(
     sourceDocId: string,
-    sourceOwnerEmail: string,
+    sourceOwnerEmail?: string,
     newName?: string
   ): Promise<drive_v3.Schema$File> {
     try {
-      const sourceDriveClient = await this.authHelper.createDriveClient(sourceOwnerEmail);
+      // Use admin drive client if sourceOwnerEmail is not provided
+      const sourceDriveClient = sourceOwnerEmail 
+        ? await this.authHelper.createDriveClient(sourceOwnerEmail)
+        : await this.authHelper.createAdminDriveClient();
 
       const copyResponse = await sourceDriveClient.files.copy({
         fileId: sourceDocId,

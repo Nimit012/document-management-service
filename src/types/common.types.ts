@@ -17,7 +17,7 @@ export interface Document {
  */
 export interface CreateDocumentRequest {
   source_reference: string;
-  source_owner: string; // Email of user who owns/can access the source document
+  source_owner?: string; // Email of user who owns/can access the source document (defaults to 'admin')
   name?: string;
   folder_path?: string;
   access_control?: AccessControl[];

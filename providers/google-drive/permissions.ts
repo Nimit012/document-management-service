@@ -23,12 +23,17 @@ export class DocumentPermissions {
   /**
    * Transfers ownership of a document to the admin.
    *
-   * @param sourceOwnerEmail Email of the current document owner.
+   * @param sourceOwnerEmail Email of the current document owner (optional, skips transfer if not provided).
    * @param fileId The ID of the file to transfer ownership of.
    * @throws {ProviderError} If the ownership transfer fails.
    */
-  async transferToAdmin(sourceOwnerEmail: string, fileId: string): Promise<void> {
+  async transferToAdmin(sourceOwnerEmail: string | undefined, fileId: string): Promise<void> {
     try {
+      // Skip ownership transfer if sourceOwnerEmail is not provided (document already owned by admin)
+      if (!sourceOwnerEmail) {
+        return;
+      }
+
       const adminEmail = this.authHelper.getAdminEmail();
       const sourceDriveClient = await this.authHelper.createDriveClient(sourceOwnerEmail);
 

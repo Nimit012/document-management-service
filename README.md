@@ -174,7 +174,7 @@ Copies a document from a source user, transfers ownership to admin, and sets up 
 ```typescript
 await docManager.createDocument({
   source_reference: string,      // Google Drive file ID to copy from
-  source_owner: string,          // Email of the source document owner
+  source_owner: string,          // Optional: Email of the source document owner (defaults to admin)
   name?: string,                 // Optional: new name for the copied document
   folder_path?: string,          // Optional: folder path (e.g., 'Course/Week1')
   access_control?: Array<{       // Optional: set initial permissions
