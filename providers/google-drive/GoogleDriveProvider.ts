@@ -67,7 +67,7 @@ export class GoogleDriveProvider implements IStorageProvider {
    * 5. Sets metadata if `metadata` is specified.
    * 6. Transforms the copied file into the Document format.
    *
-   * @param request The document creation request, including source reference, owner, name, folder path, access control, and metadata.
+   * @param request The document creation request, including source reference, optional owner (defaults to 'admin'), name, folder path, access control, and metadata.
    * @returns The created Document object.
    * @throws {ProviderError} If any step fails during the process.
    */

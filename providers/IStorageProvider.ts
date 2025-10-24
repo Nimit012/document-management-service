@@ -23,14 +23,14 @@ export interface IStorageProvider {
    * Copies a document from a source reference to create a new document in the storage system.
    *
    * The method performs the following steps:
-   * 1. Impersonates `source_owner` to access the source document.
+   * 1. Impersonates `source_owner` (or 'admin' if not provided) to access the source document.
    * 2. Copies the document to the target location.
    * 3. Transfers ownership to the admin user.
    * 4. Creates the folder structure if `folder_path` is provided.
    * 5. Sets metadata as custom properties.
    * 6. Grants permissions if `access_control` is provided.
    *
-   * @param request The document creation request, including impersonation details and metadata.
+   * @param request The document creation request, including optional source owner (defaults to 'admin'), impersonation details and metadata.
    * @returns A promise resolving to the created document with its metadata.
    */
   copyDocumentFromSource(request: CreateDocumentRequest): Promise<Document>;
