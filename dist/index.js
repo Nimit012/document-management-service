@@ -222,7 +222,7 @@ var DocumentOperations = class {
 	* Copies a document from the source owner's account.
 	*
 	* @param sourceDocId Source document ID to copy from.
-	* @param sourceOwnerEmail Email of the user who owns/can access the source.
+	* @param sourceOwnerEmail Email of the user who owns/can access the source (optional, uses admin if not provided).
 	* @param newName Name for the copied document (optional).
 	* @returns Copied file metadata as a Drive file object.
 	* @throws {NotFoundError} If the source document is not found.
@@ -230,7 +230,7 @@ var DocumentOperations = class {
 	*/
 	async copyDocument(sourceDocId, sourceOwnerEmail, newName) {
 		try {
-			return (await (await this.authHelper.createDriveClient(sourceOwnerEmail)).files.copy({
+			return (await (sourceOwnerEmail ? await this.authHelper.createDriveClient(sourceOwnerEmail) : await this.authHelper.createAdminDriveClient()).files.copy({
 				fileId: sourceDocId,
 				requestBody: { name: newName },
 				fields: "id,name,webViewLink,createdTime,modifiedTime,mimeType"
@@ -488,12 +488,13 @@ var DocumentPermissions = class {
 	/**
 	* Transfers ownership of a document to the admin.
 	*
-	* @param sourceOwnerEmail Email of the current document owner.
+	* @param sourceOwnerEmail Email of the current document owner (optional, skips transfer if not provided).
 	* @param fileId The ID of the file to transfer ownership of.
 	* @throws {ProviderError} If the ownership transfer fails.
 	*/
 	async transferToAdmin(sourceOwnerEmail, fileId) {
 		try {
+			if (!sourceOwnerEmail) return;
 			const adminEmail = this.authHelper.getAdminEmail();
 			await (await this.authHelper.createDriveClient(sourceOwnerEmail)).permissions.create({
 				fileId,
@@ -794,7 +795,7 @@ var GoogleDriveProvider = class {
 	* 5. Sets metadata if `metadata` is specified.
 	* 6. Transforms the copied file into the Document format.
 	*
-	* @param request The document creation request, including source reference, owner, name, folder path, access control, and metadata.
+	* @param request The document creation request, including source reference, optional owner (defaults to 'admin'), name, folder path, access control, and metadata.
 	* @returns The created Document object.
 	* @throws {ProviderError} If any step fails during the process.
 	*/
@@ -1035,4 +1036,3 @@ exports.PermissionError = PermissionError;
 exports.ProviderError = ProviderError;
 exports.ProviderType = ProviderType;
 exports.ValidationError = ValidationError;
-//# sourceMappingURL=index.js.map

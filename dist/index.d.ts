@@ -17,7 +17,7 @@ interface Document {
  */
 interface CreateDocumentRequest {
   source_reference: string;
-  source_owner: string;
+  source_owner?: string;
   name?: string;
   folder_path?: string;
   access_control?: AccessControl[];
@@ -250,4 +250,3 @@ declare class DocumentManager {
 }
 //#endregion
 export { AccessControl, Comment, CommentReply, CreateDocumentRequest, Document, DocumentManager, DocumentStorageError, GoogleDriveConfig, NotFoundError, NotImplementedError, PermissionError, ProviderConfig, ProviderError, ProviderType, Revision, S3Config, SearchDocumentsParams, SearchDocumentsResult, ServiceAccountKey, ValidationError };
-//# sourceMappingURL=index.d.ts.map
