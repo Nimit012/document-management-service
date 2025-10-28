@@ -1,10 +1,10 @@
-# Document Management Service
+# Google Documents Management Library
 
-The Document Based Student Activity Engine is a standalone microservice that provides document management capabilities for activities (Google Doc, Hosted on S3). It is designed to be LMS-agnostic and focuses solely on the lifecycle management of documents used in student activities.
+The Google Documents Management Library that provides document management capabilities for activities (Google Doc, Hosted on S3). It is designed to be LMS-agnostic and focuses solely on the lifecycle management of documents used in student activities.
 
 ## What It Does
 
-This service lets you programmatically manage documents across cloud providers with a single, unified interface. Built for educational platforms and enterprise environments where you need to handle document operations at scale.
+This service lets you programmatically manage documents across cloud providers with a single, unified interface.
 
 **Key capabilities:**
 - Copy documents from any user in your domain
@@ -14,11 +14,8 @@ This service lets you programmatically manage documents across cloud providers w
 - Add and search by custom metadata
 - Handle pagination for large document sets
 
-## How It Works
 
-The service uses **domain-wide delegation** to act on behalf of any user in your organization. It enables document-based learning workflows where content flows between teachers and students.
-
-### Typical Workflow This Service Enables
+## Typical Workflow This Service Enables
 
 1. **Teachers create activity content** - Teachers independently create document-based activities (exercises, assignments, tests) in their own Drive
 2. **Students get copies** - Students receive copies of the activity document to work on
@@ -28,11 +25,6 @@ The service uses **domain-wide delegation** to act on behalf of any user in your
 6. **Revision cycle** - Students can revise and resubmit based on teacher feedback
 7. **Final submission** - Once satisfied, teachers tag the last revision for final grading
 
-## Installation
-
-```bash
-npm install git+https://github.com/yourusername/doc-management-service.git
-```
 
 ## Architecture
 
@@ -56,56 +48,26 @@ Cloud Provider API (Google Drive API, AWS S3 API)
 
 Each provider is self-contained with its own authentication, operations, and permission handling. This makes it easy to add new storage providers without changing your application code.
 
+## Installation
+
+```bash
+npm install git+https://github.com/yourusername/doc-management-service.git
+```
+
 ## Basic Usage
 
 ```typescript
-import { DocumentManager, ProviderType, GoogleDriveConfig } from 'document-management-service';
-
-// Configure
-const config: GoogleDriveConfig = {
-  serviceAccountKey: {
-    type: "service_account",
-    project_id: "your-project-id",
-    private_key: "-----BEGIN PRIVATE KEY-----\n...",
-    client_email: "service-account@project.iam.gserviceaccount.com",
-    // ... other service account fields
-  },
-  adminEmail: "admin@yourdomain.com"
-};
+import { DocumentManager, ProviderType, type GoogleDriveConfig } from 'document-management-service';
 
 // Initialize
 const docManager = new DocumentManager({
   provider: ProviderType.GOOGLE_DRIVE,
-  config: config
+  config: googleAccountConfig // downloaded from service account
 });
 
 // Create a document (copy + transfer ownership + set permissions)
 const document = await docManager.createDocument({
   source_reference: 'google-drive-file-id',
-  source_owner: 'teacher@yourdomain.com',
-  name: 'Student Assignment Copy',
-  folder_path: 'Course Materials/Week 1',
-  access_control: [
-    { user: 'student@yourdomain.com', access_level: 'read' }
-  ],
-  metadata: {
-    course: 'Math 101',
-    week: 1
-  }
-});
-
-// Get document info
-const doc = await docManager.getDocument(document.id);
-
-// Update permissions
-await docManager.setAccessControl(document.id, [
-  { user: 'grader@yourdomain.com', access_level: 'read_write' }
-]);
-
-// Search by metadata
-const results = await docManager.listDocuments({
-  metadata: { course: 'Math 101' },
-  limit: 20
 });
 ```
 
@@ -114,6 +76,7 @@ const results = await docManager.listDocuments({
 ### Google Drive Configuration
 
 ```typescript
+// GoogleAccountConfig - downlaoded from service account
 const config: GoogleDriveConfig = {
   serviceAccountKey: {
     type: "service_account",
@@ -131,40 +94,6 @@ const config: GoogleDriveConfig = {
 };
 ```
 
-## Error Handling
-
-The service uses a hierarchical error system for precise error handling:
-
-```typescript
-import { 
-  NotFoundError,      // Document or resource not found
-  ProviderError,      // Cloud provider API errors
-  ValidationError,    // Invalid input parameters
-  PermissionError     // Authorization/access issues
-} from 'document-management-service';
-
-try {
-  const doc = await documentManager.createDocument({ /* ... */ });
-} catch (error) {
-  if (error instanceof NotFoundError) {
-    console.error('Document not found or user lacks access');
-  } else if (error instanceof PermissionError) {
-    console.error('Insufficient permissions:', error.message);
-  } else if (error instanceof ProviderError) {
-    console.error('Google Drive API error:', error.message);
-    // Access original error: error.originalError
-  } else if (error instanceof ValidationError) {
-    console.error('Invalid input:', error.message);
-  }
-}
-```
-
-**Common scenarios:**
-- **404 errors** → Document not found or user doesn't have access
-- **403 errors** → Insufficient permissions or domain-wide delegation not configured
-- **400 errors** → Invalid parameters or malformed service account key
-- **Rate limiting** → API quota exceeded (handled automatically with retries)
-
 ## API Reference
 
 ### createDocument(request)
@@ -174,7 +103,7 @@ Copies a document from a source user, transfers ownership to admin, and sets up 
 ```typescript
 await docManager.createDocument({
   source_reference: string,      // Google Drive file ID to copy from
-  source_owner: string,          // Optional: Email of the source document owner (defaults to admin)
+  source_owner?: string,          // Optional: Email of the source document owner (defaults to admin)
   name?: string,                 // Optional: new name for the copied document
   folder_path?: string,          // Optional: folder path (e.g., 'Course/Week1')
   access_control?: Array<{       // Optional: set initial permissions
@@ -187,7 +116,7 @@ await docManager.createDocument({
 
 **Returns:** `Document` object with `id`, `name`, `storage_reference`, `owner`, `created_at`, `updated_at`, and `metadata`.
 
-**Use case:** Perfect for copying template documents to students, creating personalized assignments, or duplicating shared resources.
+**Use case:** For copying template documents to students, creating personalized assignments, or duplicating shared resources.
 
 ---
 
@@ -351,18 +280,10 @@ await docManager.getRevisions(documentId: string);
 
 **Use case:** Critical for tracking student work progression and identifying which revision to use for final grading. Teachers can see when students made changes and tag specific revisions for evaluation.
 
+## Error Handling
 
-## Security Notes
+The library uses typed errors to help you handle different failure scenarios appropriately.
 
-- Store service account keys securely (never commit to version control)
-- Only grant necessary OAuth scopes
-- Use dedicated service accounts, not personal admin accounts
-- Follow principle of least privilege for permissions
+### Error Types
 
-## Development
-
-```bash
-pnpm install
-pnpm run build
-pnpm test
-```
+TBD
