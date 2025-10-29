@@ -1,6 +1,6 @@
 import { drive_v3 } from 'googleapis';
 import { GoogleAuthHelper } from './auth';
-import { ProviderError, NotFoundError, Comment, Revision } from '../../src/types';
+import { ProviderError, NotFoundError, PermissionError, Comment, Revision } from '../../src/types';
 
 /**
  * Helper for Google Drive document operations.
@@ -30,6 +30,7 @@ export class DocumentOperations {
    * @param newName Name for the copied document (optional).
    * @returns Copied file metadata as a Drive file object.
    * @throws {NotFoundError} If the source document is not found.
+   * @throws {PermissionError} If there are permission issues accessing the source document.
    * @throws {ProviderError} If the copy operation fails.
    */
   async copyDocument(
@@ -53,11 +54,7 @@ export class DocumentOperations {
 
       return copyResponse.data;
     } catch (error: unknown) {
-      if (error && typeof error === 'object' && 'code' in error && error.code === 404) {
-        throw new NotFoundError('Document', sourceDocId);
-      }
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new ProviderError(`Failed to copy document: ${errorMessage}`, error);
+      this._handleError(error, sourceDocId, 'copy document');
     }
   }
 
@@ -67,6 +64,9 @@ export class DocumentOperations {
    *
    * @param documentId - Document ID
    * @returns Document metadata
+   * @throws {NotFoundError} If the document is not found.
+   * @throws {PermissionError} If there are permission issues accessing the document.
+   * @throws {ProviderError} If the operation fails for other reasons.
    */
   async getDocument(documentId: string): Promise<drive_v3.Schema$File> {
     try {
@@ -83,11 +83,7 @@ export class DocumentOperations {
 
       return response.data;
     } catch (error: unknown) {
-      if (error && typeof error === 'object' && 'code' in error && error.code === 404) {
-        throw new NotFoundError('Document', documentId);
-      }
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new ProviderError(`Failed to get document ${documentId}: ${errorMessage}`, error);
+      this._handleError(error, documentId, 'get document');
     }
   }
 
@@ -97,6 +93,9 @@ export class DocumentOperations {
    *
    * @param documentId - Document ID
    * @param newName - New document name
+   * @throws {NotFoundError} If the document is not found.
+   * @throws {PermissionError} If there are permission issues updating the document.
+   * @throws {ProviderError} If the operation fails for other reasons.
    */
   async updateName(documentId: string, newName: string): Promise<void> {
     try {
@@ -110,14 +109,7 @@ export class DocumentOperations {
       });
 
     } catch (error: unknown) {
-      if (error && typeof error === 'object' && 'code' in error && error.code === 404) {
-        throw new NotFoundError('Document', documentId);
-      }
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new ProviderError(
-        `Failed to update document name ${documentId}: ${errorMessage}`,
-        error
-      );
+      this._handleError(error, documentId, 'update document name');
     }
   }
 
@@ -126,6 +118,9 @@ export class DocumentOperations {
    * Always performed as admin
    *
    * @param documentId - Document ID
+   * @throws {NotFoundError} If the document is not found.
+   * @throws {PermissionError} If there are permission issues deleting the document.
+   * @throws {ProviderError} If the operation fails for other reasons.
    */
   async deleteDocument(documentId: string): Promise<void> {
     try {
@@ -136,11 +131,7 @@ export class DocumentOperations {
       });
 
     } catch (error: unknown) {
-      if (error && typeof error === 'object' && 'code' in error && error.code === 404) {
-        throw new NotFoundError('Document', documentId);
-      }
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new ProviderError(`Failed to delete document ${documentId}: ${errorMessage}`, error);
+      this._handleError(error, documentId, 'delete document');
     }
   }
 
@@ -306,7 +297,9 @@ export class DocumentOperations {
    *
    * @param fileId The ID of the file to move.
    * @param folderId The ID of the destination folder.
-   * @throws {ProviderError} If the move operation fails.
+   * @throws {NotFoundError} If the document or folder is not found.
+   * @throws {PermissionError} If there are permission issues moving the document.
+   * @throws {ProviderError} If the move operation fails for other reasons.
    */
   async moveToFolder(fileId: string, folderId: string): Promise<void> {
     try {
@@ -328,8 +321,7 @@ export class DocumentOperations {
         fields: 'id,parents'
       });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new ProviderError(`Failed to move document to folder: ${errorMessage}`, error);
+      this._handleError(error, fileId, 'move document to folder');
     }
   }
 
@@ -340,7 +332,8 @@ export class DocumentOperations {
    * @param documentId - The unique identifier of the document.
    * @returns A promise resolving to an array of Comment objects.
    * @throws {NotFoundError} If the document is not found.
-   * @throws {ProviderError} If the operation fails.
+   * @throws {PermissionError} If there are permission issues accessing comments.
+   * @throws {ProviderError} If the operation fails for other reasons.
    */
   async getComments(documentId: string): Promise<Comment[]> {
     try {
@@ -367,14 +360,7 @@ export class DocumentOperations {
         }))
       }));
     } catch (error: unknown) {
-      if (error && typeof error === 'object' && 'code' in error && error.code === 404) {
-        throw new NotFoundError('Document', documentId);
-      }
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new ProviderError(
-        `Failed to get comments for document ${documentId}: ${errorMessage}`,
-        error
-      );
+      this._handleError(error, documentId, 'get comments for document');
     }
   }
 
@@ -385,7 +371,8 @@ export class DocumentOperations {
    * @param documentId - The unique identifier of the document.
    * @returns A promise resolving to an array of Revision objects.
    * @throws {NotFoundError} If the document is not found.
-   * @throws {ProviderError} If the operation fails.
+   * @throws {PermissionError} If there are permission issues accessing revisions.
+   * @throws {ProviderError} If the operation fails for other reasons.
    */
   async getRevisions(documentId: string): Promise<Revision[]> {
     try {
@@ -405,14 +392,44 @@ export class DocumentOperations {
         export_links: rev.exportLinks || undefined
       }));
     } catch (error: unknown) {
-      if (error && typeof error === 'object' && 'code' in error && error.code === 404) {
+      this._handleError(error, documentId, 'get revisions for document');
+    }
+  }
+
+  // ==================== PRIVATE HELPER METHODS ====================
+
+  /**
+   * Centralized error handling for document operations.
+   * Distinguishes between different error types and throws appropriate errors.
+   *
+   * @param error - The caught error
+   * @param documentId - The document ID related to the error
+   * @param operation - Description of the operation that failed
+   * @throws {PermissionError} For 403 Forbidden errors
+   * @throws {NotFoundError} For 404 Not Found errors
+   * @throws {ProviderError} For all other errors
+   */
+  private _handleError(error: unknown, documentId: string, operation: string): never {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    // Check for NotFoundError first (before checking error code)
+    if (error instanceof NotFoundError) {
+      throw error;
+    }
+
+    if (error && typeof error === 'object' && 'code' in error) {
+      // Handle HTTP status codes
+      if (error.code === 403) {
+        throw new PermissionError(
+          `Permission denied: Failed to ${operation} ${documentId}. ${errorMessage}`
+        );
+      }
+      if (error.code === 404) {
         throw new NotFoundError('Document', documentId);
       }
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new ProviderError(
-        `Failed to get revisions for document ${documentId}: ${errorMessage}`,
-        error
-      );
     }
+
+    // Default to ProviderError for all other errors
+    throw new ProviderError(`Failed to ${operation} ${documentId}: ${errorMessage}`, error);
   }
 }

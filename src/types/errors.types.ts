@@ -13,7 +13,7 @@ export class DocumentStorageError extends Error {
    * Provider-specific errors (API failures, etc.)
    */
   export class ProviderError extends DocumentStorageError {
-    constructor(message: string, public originalError?: any) {
+    constructor(message: string, public originalError?: unknown) {
       super(message);
       this.name = 'ProviderError';
       Object.setPrototypeOf(this, ProviderError.prototype);

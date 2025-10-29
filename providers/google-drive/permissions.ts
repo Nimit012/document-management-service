@@ -1,5 +1,5 @@
 import { GoogleAuthHelper } from './auth';
-import {AccessControl, ProviderError, NotFoundError } from '../../src/types';
+import {AccessControl, ProviderError, NotFoundError, PermissionError } from '../../src/types';
 
 /**
  * Permission management for Google Drive documents.
@@ -26,6 +26,8 @@ export class DocumentPermissions {
    * @param sourceOwnerEmail Email of the current document owner (optional, skips transfer if not provided).
    * @param fileId The ID of the file to transfer ownership of.
    * @throws {ProviderError} If the ownership transfer fails.
+   * @throws {PermissionError} If there are permission issues during transfer.
+   * @throws {NotFoundError} If the document is not found.
    */
   async transferToAdmin(sourceOwnerEmail: string | undefined, fileId: string): Promise<void> {
     try {
@@ -66,8 +68,7 @@ export class DocumentPermissions {
         });
       }
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new ProviderError(`Failed to transfer ownership to admin: ${errorMessage}`, error);
+      this._handleError(error, fileId, 'transfer ownership to admin');
     }
   }
 
@@ -83,6 +84,9 @@ export class DocumentPermissions {
    *
    * @param documentId - Document ID
    * @param accessControl - Array of access control rules
+   * @throws {PermissionError} If permission operations fail due to authorization issues.
+   * @throws {NotFoundError} If the document is not found.
+   * @throws {ProviderError} If the operation fails for other reasons.
    */
   async setPermissions(documentId: string, accessControl: AccessControl[]): Promise<void> {
     try {
@@ -119,27 +123,30 @@ export class DocumentPermissions {
       for (const ac of accessControl) {
         const role = this._mapAccessLevelToRole(ac.access_level);
 
-        await adminDriveClient.permissions.create({
-          fileId: documentId,
-          requestBody: {
-            role: role,
-            type: 'user',
-            emailAddress: ac.user
-          },
-          sendNotificationEmail: false // Don't spam users with emails
-        });
-
+        try {
+          await adminDriveClient.permissions.create({
+            fileId: documentId,
+            requestBody: {
+              role: role,
+              type: 'user',
+              emailAddress: ac.user
+            },
+            sendNotificationEmail: false // Don't spam users with emails
+          });
+        } catch (error) {
+          // Check for permission-specific errors during permission creation
+          if (error && typeof error === 'object' && 'code' in error && error.code === 403) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            throw new PermissionError(
+              `Failed to grant ${ac.access_level} access to user ${ac.user} on document ${documentId}: ${errorMessage}`
+            );
+          }
+          throw error; // Re-throw other errors to be handled by outer catch
+        }
       }
 
     } catch (error: unknown) {
-      if (error && typeof error === 'object' && 'code' in error && error.code === 404) {
-        throw new NotFoundError('Document', documentId);
-      }
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new ProviderError(
-        `Failed to set permissions on document ${documentId}: ${errorMessage}`,
-        error
-      );
+      this._handleError(error, documentId, 'set permissions on document');
     }
   }
 
@@ -150,6 +157,9 @@ export class DocumentPermissions {
    *
    * @param documentId - Document ID
    * @returns Array of access control rules
+   * @throws {PermissionError} If there are permission issues accessing the document.
+   * @throws {NotFoundError} If the document is not found.
+   * @throws {ProviderError} If the operation fails for other reasons.
    */
   async getPermissions(documentId: string): Promise<AccessControl[]> {
     try {
@@ -172,14 +182,7 @@ export class DocumentPermissions {
 
       return accessControl;
     } catch (error: unknown) {
-      if (error && typeof error === 'object' && 'code' in error && error.code === 404) {
-        throw new NotFoundError('Document', documentId);
-      }
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new ProviderError(
-        `Failed to get permissions for document ${documentId}: ${errorMessage}`,
-        error
-      );
+      this._handleError(error, documentId, 'get permissions for document');
     }
   }
 
@@ -220,5 +223,35 @@ export class DocumentPermissions {
     };
 
     return mapping[role] || 'read'; // Default to read if unknown
+  }
+
+  /**
+   * Centralized error handling for permission operations.
+   * Distinguishes between different error types and throws appropriate errors.
+   *
+   * @param error - The caught error
+   * @param documentId - The document ID related to the error
+   * @param operation - Description of the operation that failed
+   * @throws {PermissionError} For 403 Forbidden errors
+   * @throws {NotFoundError} For 404 Not Found errors
+   * @throws {ProviderError} For all other errors
+   */
+  private _handleError(error: unknown, documentId: string, operation: string): never {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    if (error && typeof error === 'object' && 'code' in error) {
+      // Handle HTTP status codes
+      if (error.code === 403) {
+        throw new PermissionError(
+          `Permission denied: Failed to ${operation} ${documentId}. ${errorMessage}`
+        );
+      }
+      if (error.code === 404) {
+        throw new NotFoundError('Document', documentId);
+      }
+    }
+
+    // Default to ProviderError for all other errors
+    throw new ProviderError(`Failed to ${operation} ${documentId}: ${errorMessage}`, error);
   }
 }
