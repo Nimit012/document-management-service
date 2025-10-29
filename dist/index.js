@@ -139,7 +139,8 @@ var GoogleAuthHelper = class {
 	*
 	* @param impersonateEmail Email of the user to impersonate.
 	* @returns Authenticated GoogleAuth client.
-	* @throws {ProviderError} If the client cannot be created.
+	* @throws {ProviderError} If the client cannot be created due to configuration issues.
+	* @throws {PermissionError} If domain-wide delegation is not properly configured.
 	*/
 	createAuthClient(impersonateEmail) {
 		try {
@@ -149,7 +150,7 @@ var GoogleAuthHelper = class {
 				clientOptions: { subject: impersonateEmail }
 			});
 		} catch (error) {
-			throw new ProviderError(`Failed to create auth client for user: ${impersonateEmail}`, error);
+			this._handleAuthError(error, impersonateEmail);
 		}
 	}
 	/**
@@ -160,6 +161,7 @@ var GoogleAuthHelper = class {
 	* @param impersonateEmail Email of the user to impersonate.
 	* @returns Google Drive v3 API client.
 	* @throws {ProviderError} If the client cannot be created.
+	* @throws {PermissionError} If authentication/authorization fails.
 	*/
 	async createDriveClient(impersonateEmail) {
 		if (this.driveClientCache.has(impersonateEmail)) return this.driveClientCache.get(impersonateEmail);
@@ -172,7 +174,7 @@ var GoogleAuthHelper = class {
 			this.driveClientCache.set(impersonateEmail, driveClient);
 			return driveClient;
 		} catch (error) {
-			throw new ProviderError(`Failed to create Drive client for user: ${impersonateEmail}`, error);
+			this._handleAuthError(error, impersonateEmail);
 		}
 	}
 	/**
@@ -189,9 +191,29 @@ var GoogleAuthHelper = class {
 	* configured during initialization.
 	* 
 	* @returns Google Drive v3 API client authenticated as admin.
+	* @throws {ProviderError} If the client cannot be created.
+	* @throws {PermissionError} If authentication fails.
 	*/
 	async createAdminDriveClient() {
 		return this.createDriveClient(this.adminEmail);
+	}
+	/**
+	* Centralized error handling for authentication operations.
+	* Distinguishes between configuration errors and permission/authentication errors.
+	*
+	* @param error - The caught error
+	* @param email - The email of the user being authenticated
+	* @throws {PermissionError} For authentication/authorization errors
+	* @throws {ProviderError} For configuration and other errors
+	*/
+	_handleAuthError(error, email) {
+		const errorMessage = error instanceof Error ? error.message : "Unknown error";
+		if (error && typeof error === "object" && "code" in error) {
+			if (error.code === 401 || error.code === 403) throw new PermissionError(`Authentication failed for user ${email}. ${errorMessage}. Please verify domain-wide delegation is configured correctly.`);
+		}
+		const errorMsgLower = errorMessage.toLowerCase();
+		if (errorMsgLower.includes("unauthorized") || errorMsgLower.includes("forbidden") || errorMsgLower.includes("access denied") || errorMsgLower.includes("permission") || errorMsgLower.includes("authentication")) throw new PermissionError(`Permission error during authentication for user ${email}: ${errorMessage}`);
+		throw new ProviderError(`Failed to create authentication client for user: ${email}. ${errorMessage}`, error);
 	}
 };
 
@@ -226,6 +248,7 @@ var DocumentOperations = class {
 	* @param newName Name for the copied document (optional).
 	* @returns Copied file metadata as a Drive file object.
 	* @throws {NotFoundError} If the source document is not found.
+	* @throws {PermissionError} If there are permission issues accessing the source document.
 	* @throws {ProviderError} If the copy operation fails.
 	*/
 	async copyDocument(sourceDocId, sourceOwnerEmail, newName) {
@@ -236,8 +259,7 @@ var DocumentOperations = class {
 				fields: "id,name,webViewLink,createdTime,modifiedTime,mimeType"
 			})).data;
 		} catch (error) {
-			if (error && typeof error === "object" && "code" in error && error.code === 404) throw new NotFoundError("Document", sourceDocId);
-			throw new ProviderError(`Failed to copy document: ${error instanceof Error ? error.message : "Unknown error"}`, error);
+			this._handleError(error, sourceDocId, "copy document");
 		}
 	}
 	/**
@@ -246,6 +268,9 @@ var DocumentOperations = class {
 	*
 	* @param documentId - Document ID
 	* @returns Document metadata
+	* @throws {NotFoundError} If the document is not found.
+	* @throws {PermissionError} If there are permission issues accessing the document.
+	* @throws {ProviderError} If the operation fails for other reasons.
 	*/
 	async getDocument(documentId) {
 		try {
@@ -256,8 +281,7 @@ var DocumentOperations = class {
 			if (!response.data) throw new NotFoundError("Document", documentId);
 			return response.data;
 		} catch (error) {
-			if (error && typeof error === "object" && "code" in error && error.code === 404) throw new NotFoundError("Document", documentId);
-			throw new ProviderError(`Failed to get document ${documentId}: ${error instanceof Error ? error.message : "Unknown error"}`, error);
+			this._handleError(error, documentId, "get document");
 		}
 	}
 	/**
@@ -266,6 +290,9 @@ var DocumentOperations = class {
 	*
 	* @param documentId - Document ID
 	* @param newName - New document name
+	* @throws {NotFoundError} If the document is not found.
+	* @throws {PermissionError} If there are permission issues updating the document.
+	* @throws {ProviderError} If the operation fails for other reasons.
 	*/
 	async updateName(documentId, newName) {
 		try {
@@ -274,8 +301,7 @@ var DocumentOperations = class {
 				requestBody: { name: newName }
 			});
 		} catch (error) {
-			if (error && typeof error === "object" && "code" in error && error.code === 404) throw new NotFoundError("Document", documentId);
-			throw new ProviderError(`Failed to update document name ${documentId}: ${error instanceof Error ? error.message : "Unknown error"}`, error);
+			this._handleError(error, documentId, "update document name");
 		}
 	}
 	/**
@@ -283,13 +309,15 @@ var DocumentOperations = class {
 	* Always performed as admin
 	*
 	* @param documentId - Document ID
+	* @throws {NotFoundError} If the document is not found.
+	* @throws {PermissionError} If there are permission issues deleting the document.
+	* @throws {ProviderError} If the operation fails for other reasons.
 	*/
 	async deleteDocument(documentId) {
 		try {
 			await (await this.authHelper.createAdminDriveClient()).files.delete({ fileId: documentId });
 		} catch (error) {
-			if (error && typeof error === "object" && "code" in error && error.code === 404) throw new NotFoundError("Document", documentId);
-			throw new ProviderError(`Failed to delete document ${documentId}: ${error instanceof Error ? error.message : "Unknown error"}`, error);
+			this._handleError(error, documentId, "delete document");
 		}
 	}
 	/**
@@ -392,7 +420,9 @@ var DocumentOperations = class {
 	*
 	* @param fileId The ID of the file to move.
 	* @param folderId The ID of the destination folder.
-	* @throws {ProviderError} If the move operation fails.
+	* @throws {NotFoundError} If the document or folder is not found.
+	* @throws {PermissionError} If there are permission issues moving the document.
+	* @throws {ProviderError} If the move operation fails for other reasons.
 	*/
 	async moveToFolder(fileId, folderId) {
 		try {
@@ -408,7 +438,7 @@ var DocumentOperations = class {
 				fields: "id,parents"
 			});
 		} catch (error) {
-			throw new ProviderError(`Failed to move document to folder: ${error instanceof Error ? error.message : "Unknown error"}`, error);
+			this._handleError(error, fileId, "move document to folder");
 		}
 	}
 	/**
@@ -418,7 +448,8 @@ var DocumentOperations = class {
 	* @param documentId - The unique identifier of the document.
 	* @returns A promise resolving to an array of Comment objects.
 	* @throws {NotFoundError} If the document is not found.
-	* @throws {ProviderError} If the operation fails.
+	* @throws {PermissionError} If there are permission issues accessing comments.
+	* @throws {ProviderError} If the operation fails for other reasons.
 	*/
 	async getComments(documentId) {
 		try {
@@ -439,8 +470,7 @@ var DocumentOperations = class {
 				}))
 			}));
 		} catch (error) {
-			if (error && typeof error === "object" && "code" in error && error.code === 404) throw new NotFoundError("Document", documentId);
-			throw new ProviderError(`Failed to get comments for document ${documentId}: ${error instanceof Error ? error.message : "Unknown error"}`, error);
+			this._handleError(error, documentId, "get comments for document");
 		}
 	}
 	/**
@@ -450,7 +480,8 @@ var DocumentOperations = class {
 	* @param documentId - The unique identifier of the document.
 	* @returns A promise resolving to an array of Revision objects.
 	* @throws {NotFoundError} If the document is not found.
-	* @throws {ProviderError} If the operation fails.
+	* @throws {PermissionError} If there are permission issues accessing revisions.
+	* @throws {ProviderError} If the operation fails for other reasons.
 	*/
 	async getRevisions(documentId) {
 		try {
@@ -464,9 +495,28 @@ var DocumentOperations = class {
 				export_links: rev.exportLinks || void 0
 			}));
 		} catch (error) {
-			if (error && typeof error === "object" && "code" in error && error.code === 404) throw new NotFoundError("Document", documentId);
-			throw new ProviderError(`Failed to get revisions for document ${documentId}: ${error instanceof Error ? error.message : "Unknown error"}`, error);
+			this._handleError(error, documentId, "get revisions for document");
 		}
+	}
+	/**
+	* Centralized error handling for document operations.
+	* Distinguishes between different error types and throws appropriate errors.
+	*
+	* @param error - The caught error
+	* @param documentId - The document ID related to the error
+	* @param operation - Description of the operation that failed
+	* @throws {PermissionError} For 403 Forbidden errors
+	* @throws {NotFoundError} For 404 Not Found errors
+	* @throws {ProviderError} For all other errors
+	*/
+	_handleError(error, documentId, operation) {
+		const errorMessage = error instanceof Error ? error.message : "Unknown error";
+		if (error instanceof NotFoundError) throw error;
+		if (error && typeof error === "object" && "code" in error) {
+			if (error.code === 403) throw new PermissionError(`Permission denied: Failed to ${operation} ${documentId}. ${errorMessage}`);
+			if (error.code === 404) throw new NotFoundError("Document", documentId);
+		}
+		throw new ProviderError(`Failed to ${operation} ${documentId}: ${errorMessage}`, error);
 	}
 };
 
@@ -491,6 +541,8 @@ var DocumentPermissions = class {
 	* @param sourceOwnerEmail Email of the current document owner (optional, skips transfer if not provided).
 	* @param fileId The ID of the file to transfer ownership of.
 	* @throws {ProviderError} If the ownership transfer fails.
+	* @throws {PermissionError} If there are permission issues during transfer.
+	* @throws {NotFoundError} If the document is not found.
 	*/
 	async transferToAdmin(sourceOwnerEmail, fileId) {
 		try {
@@ -515,7 +567,7 @@ var DocumentPermissions = class {
 				permissionId: teacherPermission.id
 			});
 		} catch (error) {
-			throw new ProviderError(`Failed to transfer ownership to admin: ${error instanceof Error ? error.message : "Unknown error"}`, error);
+			this._handleError(error, fileId, "transfer ownership to admin");
 		}
 	}
 	/**
@@ -530,6 +582,9 @@ var DocumentPermissions = class {
 	*
 	* @param documentId - Document ID
 	* @param accessControl - Array of access control rules
+	* @throws {PermissionError} If permission operations fail due to authorization issues.
+	* @throws {NotFoundError} If the document is not found.
+	* @throws {ProviderError} If the operation fails for other reasons.
 	*/
 	async setPermissions(documentId, accessControl) {
 		try {
@@ -551,19 +606,26 @@ var DocumentPermissions = class {
 			}
 			for (const ac of accessControl) {
 				const role = this._mapAccessLevelToRole(ac.access_level);
-				await adminDriveClient.permissions.create({
-					fileId: documentId,
-					requestBody: {
-						role,
-						type: "user",
-						emailAddress: ac.user
-					},
-					sendNotificationEmail: false
-				});
+				try {
+					await adminDriveClient.permissions.create({
+						fileId: documentId,
+						requestBody: {
+							role,
+							type: "user",
+							emailAddress: ac.user
+						},
+						sendNotificationEmail: false
+					});
+				} catch (error) {
+					if (error && typeof error === "object" && "code" in error && error.code === 403) {
+						const errorMessage = error instanceof Error ? error.message : "Unknown error";
+						throw new PermissionError(`Failed to grant ${ac.access_level} access to user ${ac.user} on document ${documentId}: ${errorMessage}`);
+					}
+					throw error;
+				}
 			}
 		} catch (error) {
-			if (error && typeof error === "object" && "code" in error && error.code === 404) throw new NotFoundError("Document", documentId);
-			throw new ProviderError(`Failed to set permissions on document ${documentId}: ${error instanceof Error ? error.message : "Unknown error"}`, error);
+			this._handleError(error, documentId, "set permissions on document");
 		}
 	}
 	/**
@@ -573,6 +635,9 @@ var DocumentPermissions = class {
 	*
 	* @param documentId - Document ID
 	* @returns Array of access control rules
+	* @throws {PermissionError} If there are permission issues accessing the document.
+	* @throws {NotFoundError} If the document is not found.
+	* @throws {ProviderError} If the operation fails for other reasons.
 	*/
 	async getPermissions(documentId) {
 		try {
@@ -584,8 +649,7 @@ var DocumentPermissions = class {
 				access_level: this._mapRoleToAccessLevel(p.role)
 			}));
 		} catch (error) {
-			if (error && typeof error === "object" && "code" in error && error.code === 404) throw new NotFoundError("Document", documentId);
-			throw new ProviderError(`Failed to get permissions for document ${documentId}: ${error instanceof Error ? error.message : "Unknown error"}`, error);
+			this._handleError(error, documentId, "get permissions for document");
 		}
 	}
 	/**
@@ -616,6 +680,25 @@ var DocumentPermissions = class {
 			commenter: "comment"
 		}[role] || "read";
 	}
+	/**
+	* Centralized error handling for permission operations.
+	* Distinguishes between different error types and throws appropriate errors.
+	*
+	* @param error - The caught error
+	* @param documentId - The document ID related to the error
+	* @param operation - Description of the operation that failed
+	* @throws {PermissionError} For 403 Forbidden errors
+	* @throws {NotFoundError} For 404 Not Found errors
+	* @throws {ProviderError} For all other errors
+	*/
+	_handleError(error, documentId, operation) {
+		const errorMessage = error instanceof Error ? error.message : "Unknown error";
+		if (error && typeof error === "object" && "code" in error) {
+			if (error.code === 403) throw new PermissionError(`Permission denied: Failed to ${operation} ${documentId}. ${errorMessage}`);
+			if (error.code === 404) throw new NotFoundError("Document", documentId);
+		}
+		throw new ProviderError(`Failed to ${operation} ${documentId}: ${errorMessage}`, error);
+	}
 };
 
 //#endregion
@@ -643,6 +726,9 @@ var DocumentMetadata = class {
 	*
 	* @param documentId - Document ID
 	* @param metadata - Key-value metadata object
+	* @throws {NotFoundError} If the document is not found.
+	* @throws {PermissionError} If there are permission issues updating metadata.
+	* @throws {ProviderError} If the operation fails for other reasons.
 	*/
 	async setMetadata(documentId, metadata) {
 		try {
@@ -657,8 +743,7 @@ var DocumentMetadata = class {
 				fields: "properties"
 			});
 		} catch (error) {
-			if (error && typeof error === "object" && "code" in error && error.code === 404) throw new NotFoundError("Document", documentId);
-			throw new ProviderError(`Failed to set metadata on document ${documentId}: ${error instanceof Error ? error.message : "Unknown error"}`, error);
+			this._handleError(error, documentId, "set metadata on document");
 		}
 	}
 	/**
@@ -667,6 +752,9 @@ var DocumentMetadata = class {
 	*
 	* @param documentId - Document ID
 	* @returns Metadata object (with values parsed back from strings)
+	* @throws {NotFoundError} If the document is not found.
+	* @throws {PermissionError} If there are permission issues accessing metadata.
+	* @throws {ProviderError} If the operation fails for other reasons.
 	*/
 	async getMetadata(documentId) {
 		try {
@@ -683,8 +771,7 @@ var DocumentMetadata = class {
 			}
 			return metadata;
 		} catch (error) {
-			if (error && typeof error === "object" && "code" in error && error.code === 404) throw new NotFoundError("Document", documentId);
-			throw new ProviderError(`Failed to get metadata for document ${documentId}: ${error instanceof Error ? error.message : "Unknown error"}`, error);
+			this._handleError(error, documentId, "get metadata for document");
 		}
 	}
 	/**
@@ -703,6 +790,8 @@ var DocumentMetadata = class {
 	* @param limit - Maximum results per page (default: 20, max: 100)
 	* @param pageToken - Token from previous response for next page
 	* @returns Search results with documents and next page token
+	* @throws {PermissionError} If there are permission issues performing the search.
+	* @throws {ProviderError} If the search operation fails.
 	*/
 	async searchByMetadata(filters, limit = 20, pageToken) {
 		try {
@@ -734,7 +823,8 @@ var DocumentMetadata = class {
 				limit
 			};
 		} catch (error) {
-			throw new ProviderError(`Failed to search documents by metadata ${error instanceof Error ? error.message : "Unknown error"}`, error);
+			if (error instanceof ProviderError) throw error;
+			throw new ProviderError(`Failed to search documents by metadata: ${error instanceof Error ? error.message : "Unknown error"}`, error);
 		}
 	}
 	/**
@@ -761,6 +851,26 @@ var DocumentMetadata = class {
 			updated_at: file.modifiedTime || void 0,
 			metadata: Object.keys(metadata).length > 0 ? metadata : void 0
 		};
+	}
+	/**
+	* Centralized error handling for metadata operations.
+	* Distinguishes between different error types and throws appropriate errors.
+	*
+	* @param error - The caught error
+	* @param documentId - The document ID related to the error
+	* @param operation - Description of the operation that failed
+	* @throws {PermissionError} For 403 Forbidden errors
+	* @throws {NotFoundError} For 404 Not Found errors
+	* @throws {ProviderError} For all other errors
+	*/
+	_handleError(error, documentId, operation) {
+		const errorMessage = error instanceof Error ? error.message : "Unknown error";
+		if (error instanceof NotFoundError || error instanceof ProviderError) throw error;
+		if (error && typeof error === "object" && "code" in error) {
+			if (error.code === 403) throw new PermissionError(`Permission denied: Failed to ${operation} ${documentId}. ${errorMessage}`);
+			if (error.code === 404) throw new NotFoundError("Document", documentId);
+		}
+		throw new ProviderError(`Failed to ${operation} ${documentId}: ${errorMessage}`, error);
 	}
 };
 
@@ -937,10 +1047,12 @@ var DocumentManager = class {
 	/**
 	* Constructs a DocumentManager instance with the specified configuration.
 	* @param options Configuration for selecting and initializing the storage provider.
-	* @throws {ValidationError} If the provider type is unsupported.
-	* @throws {Error} If the S3 provider is selected (not yet implemented).
+	* @throws {ValidationError} If the provider type is unsupported or configuration is invalid.
 	*/
 	constructor(options) {
+		if (!options) throw new ValidationError("Configuration options are required");
+		if (!options.provider) throw new ValidationError("Provider type is required");
+		if (!options.config) throw new ValidationError("Provider configuration is required");
 		if (options.provider === ProviderType.GOOGLE_DRIVE) this.provider = new GoogleDriveProvider(options.config);
 		else if (options.provider === ProviderType.S3) throw new Error("S3 provider not yet implemented");
 		else throw new ValidationError(`Unsupported provider: ${options.provider}`);
@@ -949,16 +1061,33 @@ var DocumentManager = class {
 	* Creates a new document from the specified source.
 	* @param request Details for the document to be created.
 	* @returns The created Document object.
+	* @throws {ValidationError} If source_reference is missing or invalid.
 	*/
 	async createDocument(request) {
+		if (!request) throw new ValidationError("Request object is required");
+		if (!request.source_reference || typeof request.source_reference !== "string" || request.source_reference.trim() === "") throw new ValidationError("source_reference is required and cannot be empty");
+		if (request.source_owner !== void 0) {
+			if (typeof request.source_owner !== "string" || request.source_owner.trim() === "") throw new ValidationError("source_owner must be a non-empty email string");
+			if (!this._isValidEmail(request.source_owner)) throw new ValidationError(`Invalid email format for source_owner: ${request.source_owner}`);
+		}
+		if (request.name !== void 0) {
+			if (typeof request.name !== "string") throw new ValidationError("name must be a string");
+		}
+		if (request.folder_path !== void 0) {
+			if (typeof request.folder_path !== "string" || request.folder_path.trim() === "") throw new ValidationError("folder_path must be a non-empty string");
+		}
+		if (request.access_control) this._validateAccessControl(request.access_control);
+		if (request.metadata !== void 0) this._validateMetadata(request.metadata);
 		return await this.provider.copyDocumentFromSource(request);
 	}
 	/**
 	* Get document by ID
 	* @param documentId - The unique identifier of the document.
 	* @returns A promise resolving to the found Document object, if it exists.
+	* @throws {ValidationError} If documentId is missing or invalid.
 	*/
 	async getDocument(documentId) {
+		this._validateDocumentId(documentId);
 		return await this.provider.getDocument(documentId);
 	}
 	/**
@@ -968,8 +1097,16 @@ var DocumentManager = class {
 	* @param documentId - ID of the document to update.
 	* @param updates - Object containing the new name and/or metadata to set.
 	* @returns The updated Document object.
+	* @throws {ValidationError} If documentId or updates are invalid.
 	*/
 	async updateDocument(documentId, updates) {
+		this._validateDocumentId(documentId);
+		if (!updates) throw new ValidationError("Updates object is required");
+		const hasName = updates.name !== void 0;
+		const hasMetadata = updates.metadata !== void 0;
+		if (!hasName && !hasMetadata) throw new ValidationError("At least one of name or metadata must be provided for update");
+		if (hasName && (typeof updates.name !== "string" || updates.name.trim() === "")) throw new ValidationError("name must be a non-empty string");
+		if (hasMetadata && updates.metadata !== void 0) this._validateMetadata(updates.metadata);
 		return await this.provider.updateDocument(documentId, updates);
 	}
 	/**
@@ -978,8 +1115,10 @@ var DocumentManager = class {
 	*
 	* @param documentId - The unique identifier of the document to delete.
 	* @returns A promise that resolves when the document is deleted.
+	* @throws {ValidationError} If documentId is missing or invalid.
 	*/
 	async deleteDocument(documentId) {
+		this._validateDocumentId(documentId);
 		return await this.provider.deleteDocument(documentId);
 	}
 	/**
@@ -988,8 +1127,11 @@ var DocumentManager = class {
 	* @param documentId - The unique identifier of the document to update permissions for.
 	* @param accessControl - An array of AccessControl objects specifying the new permissions.
 	* @returns A promise that resolves when permissions are set.
+	* @throws {ValidationError} If documentId or accessControl are invalid.
 	*/
 	async setAccessControl(documentId, accessControl) {
+		this._validateDocumentId(documentId);
+		this._validateAccessControl(accessControl);
 		return await this.provider.setPermissions(documentId, accessControl);
 	}
 	/**
@@ -997,10 +1139,18 @@ var DocumentManager = class {
 	*
 	* @param filters - An object containing metadata key-value pairs to filter documents.
 	* @param limit - The maximum number of documents to retrieve (default: 20).
-	* @param offset - The number of documents to skip before starting to collect the result set (default: 0).
+	* @param pageToken - Optional token for pagination (obtained from previous search).
 	* @returns A promise that resolves to a SearchDocumentsResult containing the found documents and any pagination info.
+	* @throws {ValidationError} If limit is invalid or filters are not an object.
 	*/
 	async listDocuments(filters, limit = 20, pageToken) {
+		if (filters === null || filters === void 0) throw new ValidationError("filters must be an object");
+		if (typeof filters !== "object" || Array.isArray(filters)) throw new ValidationError("filters must be an object, not an array or null");
+		if (!Number.isInteger(limit) || limit < 1) throw new ValidationError("limit must be a positive integer (at least 1)");
+		if (limit > 100) throw new ValidationError("limit must not exceed 100");
+		if (pageToken !== void 0) {
+			if (typeof pageToken !== "string" || pageToken.trim() === "") throw new ValidationError("pageToken must be a non-empty string");
+		}
 		return await this.provider.searchByMetadata(filters, limit, pageToken);
 	}
 	/**
@@ -1008,10 +1158,12 @@ var DocumentManager = class {
 	*
 	* @param documentId - The unique identifier of the document to get comments for.
 	* @returns A promise that resolves to an array of Comment objects.
-	* @throws Error if comments are not supported by the underlying provider.
+	* @throws {ValidationError} If documentId is invalid.
+	* @throws {NotImplementedError} If comments are not supported by the provider.
 	*/
 	async getComments(documentId) {
-		if (!this.provider.getComments) throw new Error("Comments not supported by this provider");
+		this._validateDocumentId(documentId);
+		if (!this.provider.getComments) throw new NotImplementedError("Comments", this.constructor.name);
 		return await this.provider.getComments(documentId);
 	}
 	/**
@@ -1019,11 +1171,64 @@ var DocumentManager = class {
 	*
 	* @param documentId - The unique identifier of the document to get revisions for.
 	* @returns A promise that resolves to an array of Revision objects.
-	* @throws Error if revisions are not supported by the underlying provider.
+	* @throws {ValidationError} If documentId is invalid.
+	* @throws {NotImplementedError} If revisions are not supported by the provider.
 	*/
 	async getRevisions(documentId) {
-		if (!this.provider.getRevisions) throw new Error("Revisions not supported by this provider");
+		this._validateDocumentId(documentId);
+		if (!this.provider.getRevisions) throw new NotImplementedError("Revisions", this.constructor.name);
 		return await this.provider.getRevisions(documentId);
+	}
+	/**
+	* Validates that a documentId is non-empty and properly formatted.
+	* @param documentId - The document ID to validate.
+	* @throws {ValidationError} If the documentId is invalid.
+	*/
+	_validateDocumentId(documentId) {
+		if (!documentId || typeof documentId !== "string" || documentId.trim() === "") throw new ValidationError("documentId is required and cannot be empty");
+	}
+	/**
+	* Validates an array of AccessControl objects.
+	* @param accessControl - The access control array to validate.
+	* @throws {ValidationError} If the access control array or any entry is invalid.
+	*/
+	_validateAccessControl(accessControl) {
+		if (!Array.isArray(accessControl)) throw new ValidationError("accessControl must be an array");
+		if (accessControl.length === 0) throw new ValidationError("accessControl array cannot be empty");
+		const validAccessLevels = [
+			"read",
+			"read_write",
+			"comment"
+		];
+		for (let i = 0; i < accessControl.length; i++) {
+			const ac = accessControl[i];
+			if (!ac || typeof ac !== "object") throw new ValidationError(`accessControl[${i}] must be an object`);
+			if (!ac.user || typeof ac.user !== "string" || ac.user.trim() === "") throw new ValidationError(`accessControl[${i}].user must be a non-empty email string`);
+			if (!this._isValidEmail(ac.user)) throw new ValidationError(`Invalid email format for accessControl[${i}].user: ${ac.user}`);
+			if (!ac.access_level || typeof ac.access_level !== "string") throw new ValidationError(`accessControl[${i}].access_level must be a string`);
+			if (!validAccessLevels.includes(ac.access_level)) throw new ValidationError(`accessControl[${i}].access_level must be one of: ${validAccessLevels.join(", ")}`);
+		}
+	}
+	/**
+	* Validates metadata object structure.
+	* @param metadata - The metadata to validate.
+	* @throws {ValidationError} If metadata is not a valid object.
+	*/
+	_validateMetadata(metadata) {
+		if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) throw new ValidationError("metadata must be an object");
+		for (const [key, value] of Object.entries(metadata)) {
+			if (typeof key !== "string" || key.trim() === "") throw new ValidationError("Metadata keys must be non-empty strings");
+			if (value === void 0) throw new ValidationError(`Metadata value for key '${key}' cannot be undefined. Use null instead.`);
+			if (typeof value === "function") throw new ValidationError(`Metadata value for key '${key}' cannot be a function`);
+		}
+	}
+	/**
+	* Validates if a string is a valid email format.
+	* @param email - The email string to validate.
+	* @returns True if the email is valid, false otherwise.
+	*/
+	_isValidEmail(email) {
+		return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 	}
 };
 

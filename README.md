@@ -272,9 +272,9 @@ await docManager.getRevisions(documentId: string);
 ```typescript
 {
   revision_id: string,
+  modified_time: string,
   modified_by: string,      // Email of user who made the revision
-  modified_time: string,    // ISO 8601 timestamp
-  size?: number            // File size in bytes (if available)
+  export_links?: Record<string, string>  // Links to export in different formats (if available)
 }
 ```
 
@@ -286,4 +286,67 @@ The library uses typed errors to help you handle different failure scenarios app
 
 ### Error Types
 
-TBD
+```typescript
+// Base error for all library errors
+DocumentStorageError
+
+// Specific error types
+ValidationError      // Invalid input parameters
+NotFoundError        // Document/resource not found (HTTP 404)
+PermissionError      // Authentication/authorization issues (HTTP 403/401)
+ProviderError        // API/provider-related failures (HTTP 4xx/5xx, network issues)
+NotImplementedError  // Feature not available for the provider
+```
+
+### Common Error Scenarios
+
+**Validation Errors** - Invalid or missing required parameters:
+```typescript
+try {
+  await docManager.createDocument({
+    source_reference: '' // Empty ID
+  });
+} catch (error) {
+  if (error instanceof ValidationError) {
+    console.log('Invalid input:', error.message);
+  }
+}
+```
+
+**Not Found Errors** - Document doesn't exist or has been deleted:
+```typescript
+try {
+  await docManager.getDocument('invalid-id');
+} catch (error) {
+  if (error instanceof NotFoundError) {
+    console.log('Document not found');
+  }
+}
+```
+
+**Permission Errors** - Authentication or authorization failures:
+```typescript
+try {
+  await docManager.createDocument({
+    source_reference: 'some-id',
+    source_owner: 'unauthorized@example.com'
+  });
+} catch (error) {
+  if (error instanceof PermissionError) {
+    console.log('Permission denied:', error.message);
+    // Check service account permissions or domain-wide delegation
+  }
+}
+```
+
+**Provider Errors** - API failures, network issues, or other provider problems:
+```typescript
+try {
+  await docManager.listDocuments({ activity_id: '123' });
+} catch (error) {
+  if (error instanceof ProviderError) {
+    console.error('API error:', error.message);
+    // May include originalError for detailed diagnostics
+  }
+}
+```

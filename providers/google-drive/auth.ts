@@ -1,8 +1,7 @@
 import { google } from 'googleapis';
 import { GoogleAuth } from 'google-auth-library';
 import { drive_v3 } from 'googleapis';
-import { GoogleDriveConfig, ServiceAccountKey } from '../../src/types';
-import { ProviderError } from '../../src/types';
+import { GoogleDriveConfig, ServiceAccountKey, ProviderError, PermissionError } from '../../src/types';
 
 /**
  * Google authentication helper for Drive API operations.
@@ -79,7 +78,8 @@ export class GoogleAuthHelper {
    *
    * @param impersonateEmail Email of the user to impersonate.
    * @returns Authenticated GoogleAuth client.
-   * @throws {ProviderError} If the client cannot be created.
+   * @throws {ProviderError} If the client cannot be created due to configuration issues.
+   * @throws {PermissionError} If domain-wide delegation is not properly configured.
    */
   private createAuthClient(impersonateEmail: string): GoogleAuth {
     try {
@@ -93,10 +93,7 @@ export class GoogleAuthHelper {
 
       return auth;
     } catch (error) {
-      throw new ProviderError(
-        `Failed to create auth client for user: ${impersonateEmail}`,
-        error,
-      );
+      this._handleAuthError(error, impersonateEmail);
     }
   }
 
@@ -108,6 +105,7 @@ export class GoogleAuthHelper {
    * @param impersonateEmail Email of the user to impersonate.
    * @returns Google Drive v3 API client.
    * @throws {ProviderError} If the client cannot be created.
+   * @throws {PermissionError} If authentication/authorization fails.
    */
   async createDriveClient(impersonateEmail: string): Promise<drive_v3.Drive> {
     // Check cache first
@@ -128,10 +126,7 @@ export class GoogleAuthHelper {
       this.driveClientCache.set(impersonateEmail, driveClient);
       return driveClient;
     } catch (error) {
-      throw new ProviderError(
-        `Failed to create Drive client for user: ${impersonateEmail}`,
-        error,
-      );
+      this._handleAuthError(error, impersonateEmail);
     }
   }
 
@@ -150,8 +145,54 @@ export class GoogleAuthHelper {
    * configured during initialization.
    * 
    * @returns Google Drive v3 API client authenticated as admin.
+   * @throws {ProviderError} If the client cannot be created.
+   * @throws {PermissionError} If authentication fails.
    */
   async createAdminDriveClient(): Promise<drive_v3.Drive> {
     return this.createDriveClient(this.adminEmail);
+  }
+
+  // ==================== PRIVATE HELPER METHODS ====================
+
+  /**
+   * Centralized error handling for authentication operations.
+   * Distinguishes between configuration errors and permission/authentication errors.
+   *
+   * @param error - The caught error
+   * @param email - The email of the user being authenticated
+   * @throws {PermissionError} For authentication/authorization errors
+   * @throws {ProviderError} For configuration and other errors
+   */
+  private _handleAuthError(error: unknown, email: string): never {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    // Check for permission/authentication related errors
+    if (error && typeof error === 'object' && 'code' in error) {
+      // 401 Unauthorized or 403 Forbidden indicate authentication issues
+      if (error.code === 401 || error.code === 403) {
+        throw new PermissionError(
+          `Authentication failed for user ${email}. ${errorMessage}. ` +
+          'Please verify domain-wide delegation is configured correctly.'
+        );
+      }
+    }
+
+    // Check error message for specific authentication keywords
+    const errorMsgLower = errorMessage.toLowerCase();
+    if (errorMsgLower.includes('unauthorized') || 
+        errorMsgLower.includes('forbidden') || 
+        errorMsgLower.includes('access denied') ||
+        errorMsgLower.includes('permission') ||
+        errorMsgLower.includes('authentication')) {
+      throw new PermissionError(
+        `Permission error during authentication for user ${email}: ${errorMessage}`
+      );
+    }
+
+    // Default to ProviderError for configuration and other errors
+    throw new ProviderError(
+      `Failed to create authentication client for user: ${email}. ${errorMessage}`,
+      error
+    );
   }
 }

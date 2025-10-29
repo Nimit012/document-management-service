@@ -1,5 +1,5 @@
 import { GoogleAuthHelper } from './auth';
-import { Document, NotFoundError, ProviderError, SearchDocumentsResult } from '../../src/types';
+import { Document, NotFoundError, ProviderError, PermissionError, SearchDocumentsResult } from '../../src/types';
 import { drive_v3 } from 'googleapis';
 
 /**
@@ -31,6 +31,9 @@ export class DocumentMetadata {
    *
    * @param documentId - Document ID
    * @param metadata - Key-value metadata object
+   * @throws {NotFoundError} If the document is not found.
+   * @throws {PermissionError} If there are permission issues updating metadata.
+   * @throws {ProviderError} If the operation fails for other reasons.
    */
   async setMetadata(documentId: string, metadata: Record<string, unknown>): Promise<void> {
     try {
@@ -58,14 +61,7 @@ export class DocumentMetadata {
       });
 
     } catch (error: unknown) {
-      if (error && typeof error === 'object' && 'code' in error && error.code === 404) {
-        throw new NotFoundError('Document', documentId);
-      }
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new ProviderError(
-        `Failed to set metadata on document ${documentId}: ${errorMessage}`,
-        error
-      );
+      this._handleError(error, documentId, 'set metadata on document');
     }
   }
 
@@ -75,6 +71,9 @@ export class DocumentMetadata {
    *
    * @param documentId - Document ID
    * @returns Metadata object (with values parsed back from strings)
+   * @throws {NotFoundError} If the document is not found.
+   * @throws {PermissionError} If there are permission issues accessing metadata.
+   * @throws {ProviderError} If the operation fails for other reasons.
    */
   async getMetadata(documentId: string): Promise<Record<string, unknown>> {
     try {
@@ -105,15 +104,7 @@ export class DocumentMetadata {
 
       return metadata;
     } catch (error: unknown) {
-      if (error && typeof error === 'object' && 'code' in error && error.code === 404) {
-        throw new NotFoundError('Document', documentId);
-      }
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
-      throw new ProviderError(
-        `Failed to get metadata for document ${documentId}: ${errorMessage}`,
-        error
-      );
+      this._handleError(error, documentId, 'get metadata for document');
     }
   }
 
@@ -133,6 +124,8 @@ export class DocumentMetadata {
    * @param limit - Maximum results per page (default: 20, max: 100)
    * @param pageToken - Token from previous response for next page
    * @returns Search results with documents and next page token
+   * @throws {PermissionError} If there are permission issues performing the search.
+   * @throws {ProviderError} If the search operation fails.
    */
   async searchByMetadata(
     filters: Record<string, unknown>,
@@ -196,9 +189,14 @@ export class DocumentMetadata {
         limit
       };
     } catch (error: unknown) {
+      // Re-throw ProviderError without modification
+      if (error instanceof ProviderError) {
+        throw error;
+      }
+      
+      // Handle other errors
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
-      throw new ProviderError(`Failed to search documents by metadata ${errorMessage}`, error);
+      throw new ProviderError(`Failed to search documents by metadata: ${errorMessage}`, error);
     }
   }
 
@@ -234,5 +232,42 @@ export class DocumentMetadata {
       updated_at: file.modifiedTime || undefined,
       metadata: Object.keys(metadata).length > 0 ? metadata : undefined
     };
+  }
+
+  // ==================== PRIVATE HELPER METHODS ====================
+
+  /**
+   * Centralized error handling for metadata operations.
+   * Distinguishes between different error types and throws appropriate errors.
+   *
+   * @param error - The caught error
+   * @param documentId - The document ID related to the error
+   * @param operation - Description of the operation that failed
+   * @throws {PermissionError} For 403 Forbidden errors
+   * @throws {NotFoundError} For 404 Not Found errors
+   * @throws {ProviderError} For all other errors
+   */
+  private _handleError(error: unknown, documentId: string, operation: string): never {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    // Check for existing errors that should be re-thrown
+    if (error instanceof NotFoundError || error instanceof ProviderError) {
+      throw error;
+    }
+
+    if (error && typeof error === 'object' && 'code' in error) {
+      // Handle HTTP status codes
+      if (error.code === 403) {
+        throw new PermissionError(
+          `Permission denied: Failed to ${operation} ${documentId}. ${errorMessage}`
+        );
+      }
+      if (error.code === 404) {
+        throw new NotFoundError('Document', documentId);
+      }
+    }
+
+    // Default to ProviderError for all other errors
+    throw new ProviderError(`Failed to ${operation} ${documentId}: ${errorMessage}`, error);
   }
 }

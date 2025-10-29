@@ -128,8 +128,8 @@ declare class DocumentStorageError extends Error {
  * Provider-specific errors (API failures, etc.)
  */
 declare class ProviderError extends DocumentStorageError {
-  originalError?: any | undefined;
-  constructor(message: string, originalError?: any | undefined);
+  originalError?: unknown | undefined;
+  constructor(message: string, originalError?: unknown | undefined);
 }
 /**
  * Validation errors (bad input)
@@ -178,20 +178,21 @@ declare class DocumentManager {
   /**
    * Constructs a DocumentManager instance with the specified configuration.
    * @param options Configuration for selecting and initializing the storage provider.
-   * @throws {ValidationError} If the provider type is unsupported.
-   * @throws {Error} If the S3 provider is selected (not yet implemented).
+   * @throws {ValidationError} If the provider type is unsupported or configuration is invalid.
    */
   constructor(options: DocumentManagerConfig);
   /**
    * Creates a new document from the specified source.
    * @param request Details for the document to be created.
    * @returns The created Document object.
+   * @throws {ValidationError} If source_reference is missing or invalid.
    */
   createDocument(request: CreateDocumentRequest): Promise<Document>;
   /**
    * Get document by ID
    * @param documentId - The unique identifier of the document.
    * @returns A promise resolving to the found Document object, if it exists.
+   * @throws {ValidationError} If documentId is missing or invalid.
    */
   getDocument(documentId: string): Promise<Document>;
   /**
@@ -201,6 +202,7 @@ declare class DocumentManager {
    * @param documentId - ID of the document to update.
    * @param updates - Object containing the new name and/or metadata to set.
    * @returns The updated Document object.
+   * @throws {ValidationError} If documentId or updates are invalid.
    */
   updateDocument(documentId: string, updates: {
     name?: string;
@@ -212,6 +214,7 @@ declare class DocumentManager {
    *
    * @param documentId - The unique identifier of the document to delete.
    * @returns A promise that resolves when the document is deleted.
+   * @throws {ValidationError} If documentId is missing or invalid.
    */
   deleteDocument(documentId: string): Promise<void>;
   /**
@@ -220,6 +223,7 @@ declare class DocumentManager {
    * @param documentId - The unique identifier of the document to update permissions for.
    * @param accessControl - An array of AccessControl objects specifying the new permissions.
    * @returns A promise that resolves when permissions are set.
+   * @throws {ValidationError} If documentId or accessControl are invalid.
    */
   setAccessControl(documentId: string, accessControl: AccessControl[]): Promise<void>;
   /**
@@ -227,8 +231,9 @@ declare class DocumentManager {
    *
    * @param filters - An object containing metadata key-value pairs to filter documents.
    * @param limit - The maximum number of documents to retrieve (default: 20).
-   * @param offset - The number of documents to skip before starting to collect the result set (default: 0).
+   * @param pageToken - Optional token for pagination (obtained from previous search).
    * @returns A promise that resolves to a SearchDocumentsResult containing the found documents and any pagination info.
+   * @throws {ValidationError} If limit is invalid or filters are not an object.
    */
   listDocuments(filters: Record<string, unknown>, limit?: number, pageToken?: string): Promise<SearchDocumentsResult>;
   /**
@@ -236,7 +241,8 @@ declare class DocumentManager {
    *
    * @param documentId - The unique identifier of the document to get comments for.
    * @returns A promise that resolves to an array of Comment objects.
-   * @throws Error if comments are not supported by the underlying provider.
+   * @throws {ValidationError} If documentId is invalid.
+   * @throws {NotImplementedError} If comments are not supported by the provider.
    */
   getComments(documentId: string): Promise<Comment[]>;
   /**
@@ -244,9 +250,34 @@ declare class DocumentManager {
    *
    * @param documentId - The unique identifier of the document to get revisions for.
    * @returns A promise that resolves to an array of Revision objects.
-   * @throws Error if revisions are not supported by the underlying provider.
+   * @throws {ValidationError} If documentId is invalid.
+   * @throws {NotImplementedError} If revisions are not supported by the provider.
    */
   getRevisions(documentId: string): Promise<Revision[]>;
+  /**
+   * Validates that a documentId is non-empty and properly formatted.
+   * @param documentId - The document ID to validate.
+   * @throws {ValidationError} If the documentId is invalid.
+   */
+  private _validateDocumentId;
+  /**
+   * Validates an array of AccessControl objects.
+   * @param accessControl - The access control array to validate.
+   * @throws {ValidationError} If the access control array or any entry is invalid.
+   */
+  private _validateAccessControl;
+  /**
+   * Validates metadata object structure.
+   * @param metadata - The metadata to validate.
+   * @throws {ValidationError} If metadata is not a valid object.
+   */
+  private _validateMetadata;
+  /**
+   * Validates if a string is a valid email format.
+   * @param email - The email string to validate.
+   * @returns True if the email is valid, false otherwise.
+   */
+  private _isValidEmail;
 }
 //#endregion
 export { AccessControl, Comment, CommentReply, CreateDocumentRequest, Document, DocumentManager, DocumentStorageError, GoogleDriveConfig, NotFoundError, NotImplementedError, PermissionError, ProviderConfig, ProviderError, ProviderType, Revision, S3Config, SearchDocumentsParams, SearchDocumentsResult, ServiceAccountKey, ValidationError };
